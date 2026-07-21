@@ -559,6 +559,10 @@
   }
 
   // ---------- Analytics ----------
+  function helpDetailsHTML(body) {
+    return '<details class="help-details"><summary>About these numbers</summary><div class="help-details-body">' + body + '</div></details>';
+  }
+
   function renderAnalyticsAllOverview(habits, today) {
     const momentum = Logic.avgStrength(habits, state.cells, state.skips, today);
     const perfect = Logic.perfectDayStreak(habits, state.cells, state.skips, today);
@@ -574,7 +578,13 @@
       '<div class="stat"><div class="v">' + perfect + 'd</div><div class="k">perfect-day streak</div></div>' +
       '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta, r30) + '</div><div class="k">30-day rate</div></div>' +
       '<div class="stat"><div class="v stat-sm">' + weakLabel + '</div><div class="k">needs attention</div></div>' +
-    '</div>';
+    '</div>' +
+    helpDetailsHTML(
+      '<p><b>Momentum:</b> average habit strength across active habits (0–100).</p>' +
+      '<p><b>Perfect-day streak:</b> consecutive calendar days where every scheduled habit was done. Rest days do not break it.</p>' +
+      '<p><b>30-day rate:</b> share of scheduled habit-days completed in the last 30 days. Trend vs prior 30 days uses <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
+      '<p><b>Needs attention:</b> active habit with the weakest recent strength.</p>'
+    );
   }
 
   function renderAnalyticsFocusOverview(h, today) {
@@ -598,7 +608,10 @@
       '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta, r30) + '</div><div class="k">30-day rate</div></div>' +
       '<div class="stat"><div class="v">' + best + unit + '</div><div class="k">best streak</div></div>' +
     '</div>' +
-    '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days (trend vs prior 30 days; pp = percentage points). Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>';
+    helpDetailsHTML(
+      '<p><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trend vs prior 30 days uses <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
+      '<p><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>'
+    );
   }
 
   function renderAnalyticsFocusPanels(h, today, year) {
@@ -710,11 +723,13 @@
     const body = analyticsMode === 'focus'
       ? renderAnalyticsFocusPanels(habits.find(x => x.id === analyticsFocusHabitId), today, year)
       : '<div class="card"><h2>Per habit · strength / 7d / 30d</h2>' + renderAnalyticsAllRows(habits, today) +
-        '<div class="mini">Strength is an exponentially weighted average (Loop Habit Tracker model): a miss dents it, it never zeroes like a streak. Rest days never penalize.</div></div>';
+        helpDetailsHTML(
+          '<p><b>Strength:</b> exponentially weighted average (Loop Habit Tracker model). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>'
+        ) + '</div>';
 
     $('#view').innerHTML =
-      '<div class="card"><h2>Overview</h2>' + modeSeg + overview + '</div>' +
-      focusChips +
+      '<div class="card"><h2>Overview</h2>' + modeSeg + focusChips + overview + '</div>' +
+      '<div class="ana-break" role="separator"><span>Analytics</span></div>' +
       '<div class="card"><h2>' + heatTitle + '</h2>' +
         yearPickerHTML(years, year) +
         yearHeat +
@@ -748,7 +763,7 @@
         '<div class="card help"><h2>Phone + laptop sync</h2>' +
         '<p>Optional. Keeps habits in your Google Drive so a second device (or a cleared browser) can restore them.</p>' +
         '<div class="btnrow"><button class="btn" id="help-connect">Sign in with Google</button></div>' +
-        '<p class="mini">Google will ask for Drive access. Accept. Your habits stay in <em>your</em> Drive only.</p>' +
+        '<p class="mini">Google will ask for Drive access. Accept. Your habits stay in your Drive only.</p>' +
         '<p class="mini">If Google says access blocked, your Gmail is not on this app\'s test-user list. Ask the person who runs the Google Cloud project to add you, then try again.</p>' +
         '</div>';
     } else if (!GDrive.onHttp()) {
@@ -777,18 +792,19 @@
       '</div>' +
       '<div class="card help"><h2>Analytics</h2>' +
         '<ul>' +
-          '<li><b>All</b>: portfolio overview (momentum, perfect-day streak, 30-day rate vs prior 30 days, habit that needs attention), year heatmap in the accent color, and per-habit strength / 7d / 30d.</li>' +
-          '<li><b>Focus one</b>: switch habits with the chips. Year heatmap uses that habit\'s color; tap a past day to edit. Weekday share and last 6 months sit below.</li>' +
-          '<li>Year chips jump between calendar years when you have history.</li>' +
+          '<li><b>All</b>: portfolio overview across habits, plus per-habit rates. Open <b>About these numbers</b> on each block for definitions.</li>' +
+          '<li><b>Focus one</b>: dig into a single habit.</li>' +
         '</ul>' +
-        '<p class="mini"><b>30-day rate</b>: share of scheduled days done in the last 30 days. Trend text uses <b>pp</b> (percentage points). At high rates, no change may read as holding strong. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory); a miss dents it, it never zeroes like a streak. Rest days never penalize. Milestone chips (<b>3d+</b> / <b>7d+</b>, or <b>2w+</b> / <b>4w+</b> for weekly habits) appear on Today and Analytics.</p>' +
+        '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
+        '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
+        '<p class="mini"><b>Milestone chips:</b> <b>3d+</b> / <b>7d+</b> (or <b>2w+</b> / <b>4w+</b> for weekly habits) on Today and Analytics when you hit them.</p>' +
       '</div>' +
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
           '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one and checks use each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
-          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
+          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears. On iPhone/iPad (Safari): Share → <b>Add to Home Screen</b> → Add.</li>' +
         '</ul>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +

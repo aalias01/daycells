@@ -27,10 +27,12 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - **Today:** tap the check to log a day. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Today for that day. **See all notes** lists older notes and jumps to that day.
-- **Analytics → All:** portfolio overview (momentum, perfect-day streak, 30-day rate trend, needs attention), calendar-year heatmap (accent colors; shade = share of scheduled habits done), and per-habit strength / 7d / 30d rows.
-- **Analytics → Focus one:** pick one habit via chips. Year heatmap uses that habit’s color (tap a day to edit). Stats, weekday share, and last 6 months sit below. No intensity legend here (cells are done / rest / empty).
-- Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry. Milestone chips (**3d+** / **7d+**, or **2w+** / **4w+** for weekly habits) show on Today and Analytics when you hit them.
-- **Strength** (0–100) is an EWMA (Loop Habit Tracker style): recent days count more (~2-week memory for daily habits). A miss dents it; it does not zero like a streak. Rest days never penalize.
+- **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
+- **Analytics → Focus one:** dig into a single habit.
+- Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
+- **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.
+- **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
+- **Milestone chips:** **3d+** / **7d+** (or **2w+** / **4w+** for weekly habits) on Today and Analytics when you hit them.
 - Theme: Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
@@ -43,7 +45,7 @@ Daycells is a progressive web app (PWA): after you add it to the home screen, it
 | Platform | What to do |
 |----------|------------|
 | **Android** (Chrome / Edge) | Settings → **Home screen** → **Install Daycells** when the button appears. Or browser menu → Install app. |
-| **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. Settings → **Home screen** → **How to add**: Share → **Add to Home Screen** → Add. |
+| **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. In Safari: Share → **Add to Home Screen** → Add. Settings → **Home screen** shows the same steps. |
 | **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
 
 Already installed (opened from the home-screen icon): Settings shows that you are running as an installed app.
@@ -156,6 +158,6 @@ images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 - Devices diverge: same Google account on both; tap the header sync dot.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
 - No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
-- iPhone Install button missing: expected. Use Settings → Home screen → How to add (Safari Share → Add to Home Screen).
+- iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.
 - Want Data Access filled in: add scopes manually (optional section above). Sign-in will not populate that page for you.
 - Fork Sign in does nothing useful with someone else’s Client ID on your domain: create your own Web client and origins.

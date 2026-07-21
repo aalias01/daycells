@@ -469,13 +469,35 @@ button.calcell:active { transform: scale(.96); }
 /* analytics */
 .seg.analyticsseg { margin: 0 0 10px; max-width: 280px; }
 .habitchips {
-  display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 10px; margin-top: -4px;
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 12px; margin: 0;
 }
 .habitchip {
   flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink);
   border-radius: 999px; padding: 6px 11px; font-size: 12px; white-space: nowrap;
 }
 .habitchip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ana-break {
+  display: flex; align-items: center; gap: 12px; margin: 20px 2px 18px;
+  color: var(--muted); font-size: 11px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+}
+.ana-break::before,
+.ana-break::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.ana-break span { flex: 0 0 auto; }
+.help-details { margin-top: 10px; }
+.help-details > summary {
+  cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; font-family: var(--font-mono);
+  user-select: none;
+}
+.help-details > summary::-webkit-details-marker { display: none; }
+.help-details > summary::before {
+  content: '▸ '; display: inline-block; transition: transform .12s ease;
+}
+.help-details[open] > summary::before { transform: rotate(90deg); }
+.help-details-body { margin-top: 8px; }
+.help-details-body p {
+  margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.5;
+}
+.help-details-body p:last-child { margin-bottom: 0; }
 .yearchips { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 8px; padding: 2px 0; -webkit-overflow-scrolling: touch; }
 .yearchip {
   flex: 0 0 auto;
