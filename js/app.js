@@ -14,6 +14,8 @@
   let presetsOpen = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
+  let calOpen = false;   // custom themed date picker
+  let calMonth = null;   // 'YYYY-MM' while calendar is open
 
   /* Preset library. Grounded in what people actually track (Loggd 2026 data:
      exercise, water, reading, journaling, meditation, sleep, vitamins lead)
@@ -90,14 +92,30 @@
   }
 
   // ---------- render root ----------
+  function syncDotClass() {
+    const enabled = Sync.state().enabled;
+    const s = syncStatus.s;
+    if (!enabled) return s === 'off' ? 'off' : s;
+    if (s === 'syncing' || s === 'pending') return s;
+    if (s === 'error') return 'error';
+    return 'ok'; // signed in: green, even if a quiet re-auth is needed
+  }
+
+  function syncDotTitle() {
+    const enabled = Sync.state().enabled;
+    if (enabled && (syncStatus.s === 'ok' || syncStatus.s === 'off' || !syncStatus.s)) return 'Connected to Google Drive';
+    if (enabled && syncStatus.s === 'auth') return syncStatus.detail || 'Connected. Tap to refresh Drive sync.';
+    return syncStatus.detail || syncStatus.s;
+  }
+
   function render() {
     state = Store.get();
     applyTheme();
     const y = window.scrollY; // keep scroll position across re-renders
     document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
     const dot = $('#syncdot');
-    dot.className = 'syncdot ' + syncStatus.s;
-    dot.title = syncStatus.detail || syncStatus.s;
+    dot.className = 'syncdot ' + syncDotClass();
+    dot.title = syncDotTitle();
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
     if (activeTab === 'today') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
@@ -151,7 +169,6 @@
     $('#view').innerHTML =
       '<div class="todayhead">' +
         '<button type="button" class="date" id="pickday" aria-label="Jump to a date">' + esc(nice) + (isToday ? '' : ' <small class="pastlbl">(past day)</small>') + '</button>' +
-        '<input type="date" id="daypicker" class="daypicker" max="' + esc(today) + '" value="' + esc(iso) + '" aria-hidden="true" tabindex="-1">' +
         (due > 0 ? '<span class="chip' + (allDone ? ' on' : '') + '">' + (allDone ? 'All done ✓' : doneCount + '/' + due) + '</span>' : '') +
         '<span class="chip toggle' + (rest ? ' on' : '') + '" id="restchip" role="button">' + (rest ? '☾ rest day' : 'mark rest day') + '</span>' +
         '<span class="datenav">' +
@@ -181,17 +198,9 @@
     document.querySelectorAll('[data-open]').forEach(c => c.addEventListener('click', () => { detailId = c.dataset.open; render(); }));
     $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
     $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
-    const picker = $('#daypicker');
     $('#pickday').addEventListener('click', () => {
-      try {
-        if (typeof picker.showPicker === 'function') picker.showPicker();
-        else { picker.focus(); picker.click(); }
-      } catch (e) { picker.focus(); picker.click(); }
-    });
-    picker.addEventListener('change', () => {
-      const v = picker.value;
-      if (!v) return;
-      viewDate = v >= today ? null : v;
+      calMonth = iso.slice(0, 7);
+      calOpen = true;
       render();
     });
     $('#prevday').addEventListener('click', () => { viewDate = Logic.addDays(iso, -1); render(); });
@@ -428,17 +437,85 @@
     });
   }
 
-  // ---------- detail + editor + preset modals ----------
+  // ---------- detail + editor + preset + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
+    if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
     if (detailId) {
       const h = Store.getHabit(detailId);
       if (!h || h.deleted) { detailId = null; root.innerHTML = ''; return; }
       root.innerHTML = detailHTML(h); wireDetail(h); return;
     }
     root.innerHTML = '';
+  }
+
+  function shiftMonth(ym, delta) {
+    const p = ym.split('-');
+    let y = +p[0], m = +p[1] + delta;
+    while (m < 1) { m += 12; y--; }
+    while (m > 12) { m -= 12; y++; }
+    return y + '-' + (m < 10 ? '0' : '') + m;
+  }
+
+  function calendarHTML() {
+    const today = Logic.todayISO();
+    const selected = viewDate || today;
+    const ym = calMonth || today.slice(0, 7);
+    const y = +ym.slice(0, 4), m = +ym.slice(5, 7);
+    const firstISO = ym + '-01';
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const startDow = Logic.dowMon(firstISO);
+    const monthLabel = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const thisYm = today.slice(0, 7);
+    const canNext = ym < thisYm;
+
+    let cells = '';
+    for (let i = 0; i < startDow; i++) cells += '<span class="calcell empty"></span>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = ym + '-' + (d < 10 ? '0' : '') + d;
+      const future = iso > today;
+      const isSel = iso === selected;
+      const isTod = iso === today;
+      const cls = 'calcell' + (future ? ' future' : '') + (isSel ? ' selected' : '') + (isTod ? ' today' : '');
+      cells += future
+        ? '<span class="' + cls + '">' + d + '</span>'
+        : '<button type="button" class="' + cls + '" data-calday="' + iso + '">' + d + '</button>';
+    }
+
+    return '<div class="overlay" id="ovl"><div class="sheet calsheet"><div class="grab"></div>' +
+      '<div class="calhead">' +
+        '<button type="button" id="calprev" aria-label="previous month">‹</button>' +
+        '<div class="caltitle">' + esc(monthLabel) + '</div>' +
+        '<button type="button" id="calnext" aria-label="next month"' + (canNext ? '' : ' disabled') + '>›</button>' +
+        '<button type="button" id="calclose" aria-label="close">✕</button>' +
+      '</div>' +
+      '<div class="caldows">' + DOWS.map(d => '<span>' + d + '</span>').join('') + '</div>' +
+      '<div class="calgrid">' + cells + '</div>' +
+      '<div class="btnrow"><button class="btn ghost" id="caltoday">Jump to today</button></div>' +
+    '</div></div>';
+  }
+
+  function wireCalendar() {
+    const close = () => { calOpen = false; render(); };
+    $('#calclose').addEventListener('click', close);
+    $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') close(); });
+    $('#calprev').addEventListener('click', () => { calMonth = shiftMonth(calMonth || Logic.todayISO().slice(0, 7), -1); render(); });
+    const nx = $('#calnext');
+    if (nx) nx.addEventListener('click', () => {
+      if (nx.disabled) return;
+      calMonth = shiftMonth(calMonth || Logic.todayISO().slice(0, 7), 1);
+      render();
+    });
+    $('#caltoday').addEventListener('click', () => { viewDate = null; calOpen = false; render(); });
+    document.querySelectorAll('[data-calday]').forEach(b => b.addEventListener('click', () => {
+      const today = Logic.todayISO();
+      const v = b.dataset.calday;
+      viewDate = v >= today ? null : v;
+      calOpen = false;
+      render();
+    }));
   }
 
   // ---------- preset picker ----------
@@ -646,7 +723,11 @@
   Sync.init({
     getDoc: () => Store.get(),
     applyDoc: doc => { Store.replaceState(doc); render(); },
-    onStatus: (s, detail) => { syncStatus = { s, detail }; const dot = $('#syncdot'); if (dot) { dot.className = 'syncdot ' + s; dot.title = detail || s; } }
+    onStatus: (s, detail) => {
+      syncStatus = { s, detail };
+      const dot = $('#syncdot');
+      if (dot) { dot.className = 'syncdot ' + syncDotClass(); dot.title = syncDotTitle(); }
+    }
   });
   render();
   /* first run: open the preset picker instead of an empty screen */
