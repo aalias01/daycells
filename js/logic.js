@@ -24,12 +24,20 @@ const Logic = (() => {
   const isSkip = (skips, iso) => { const s = skips[iso]; return !!(s && s.v); };
 
   // ---------- schedules ----------
+  function isScheduled(habit, iso) {
+    const s = habit.schedule || { kind: 'daily' };
+    if (s.kind === 'daily') return true;
+    if (s.kind === 'weekdays') {
+      const days = (s.days || []).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6);
+      return days.indexOf(dowMon(iso)) !== -1;
+    }
+    return true; // perWeek: any day can count toward the target
+  }
   function isRequired(habit, iso, skips) {
     if (isSkip(skips, iso)) return false;
     const s = habit.schedule || { kind: 'daily' };
-    if (s.kind === 'daily') return true;
-    if (s.kind === 'weekdays') return (s.days || []).indexOf(dowMon(iso)) !== -1;
-    return false; // perWeek: no single required day
+    if (s.kind === 'perWeek') return false;
+    return isScheduled(habit, iso);
   }
   const isPerWeek = habit => (habit.schedule || {}).kind === 'perWeek';
   const weekTarget = habit => Math.max(1, (habit.schedule || {}).target || 1);
@@ -209,6 +217,7 @@ const Logic = (() => {
           outside: false,
           done: isDone(cells, iso, habit.id),
           skip: isSkip(skips, iso),
+          off: !isPerWeek(habit) && !isScheduled(habit, iso),
           today: iso === uptoISO
         });
       }
@@ -343,7 +352,7 @@ const Logic = (() => {
   return {
     EWMA_DAY, EWMA_WEEK,
     fmtDate, parseDate, addDays, diffDays, todayISO, dowMon, weekStartOf,
-    cellKey, isDone, isSkip, isRequired, isPerWeek, weekTarget,
+    cellKey, isDone, isSkip, isScheduled, isRequired, isPerWeek, weekTarget,
     habitStartDate, weekDoneCount, currentStreak, bestStreak, streakUnit,
     strength, completionRate, totalDone, dowBreakdown, dowShareBreakdown, monthlyCounts,
     dayScore, streakmapWeeks, streakmapCalendarYear, combinedYearHeat, dataYears,

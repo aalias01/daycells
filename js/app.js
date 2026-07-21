@@ -161,13 +161,28 @@
   }
 
   function scheduleLabel(h) {
-    const s = h.schedule || { kind: 'daily' };
+    const s = normalizeSchedule(h.schedule || { kind: 'daily' });
     if (s.kind === 'daily') return 'Every day';
     if (s.kind === 'weekdays') {
       const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return (s.days || []).map(d => names[d]).join(' · ') || 'No days set';
+      return s.days.map(d => names[d]).join(' · ') || 'No days set';
     }
     return (s.target || 1) + '× / week';
+  }
+
+  /* Weekday schedules must be 0–6 only. Bad data-day wiring used to append NaN on every click. */
+  function normalizeSchedule(schedule) {
+    const s = schedule || { kind: 'daily' };
+    if (s.kind === 'weekdays') {
+      const days = [...new Set((s.days || []).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6))]
+        .sort((a, b) => a - b);
+      return { kind: 'weekdays', days };
+    }
+    if (s.kind === 'perWeek') {
+      const target = Math.min(7, Math.max(1, +s.target || 3));
+      return { kind: 'perWeek', target };
+    }
+    return { kind: 'daily' };
   }
 
   const STREAK_CELEB_KEY = 'dc_streak_celebrate';
@@ -237,7 +252,7 @@
       } else if (c.skip) style = 'opacity:.45';
     } else {
       if (c.done) style = 'background:' + esc(ink);
-      else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
+      else if ((c.skip || c.off) && !c.future) style = 'background:' + hexToRgba(ink, .18);
     }
     const canEdit = editable && !c.future && !c.outside;
     return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '"' +
@@ -360,6 +375,7 @@
         const future = c.iso > today;
         if (c.done) style = 'background:' + esc(ink);
         else if (c.skip && !future) style = 'background:' + hexToRgba(ink, .18);
+        else if (!Logic.isPerWeek(h) && !Logic.isScheduled(h, c.iso) && !future) style = 'background:' + hexToRgba(ink, .18);
         return '<span class="c' + (future ? ' future' : '') + (c.iso === today ? ' today' : '') + '" data-cell="' + c.iso + '" style="' + style + '"></span>';
       }).join('') + '</div>').join('') + '</div>';
   }
@@ -588,9 +604,11 @@
       const chip = streakHeatChipHTML(h, streak, h.id);
       return '<div class="hcard compact">' +
         '<div class="top">' +
-          '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
-          '<span class="nm"><div class="name">' + esc(h.name) + ' ' + chip + '</div>' +
-            '<div class="meta">' + esc(scheduleLabel(h)) + perWeekNote + ' · ' + streak + Logic.streakUnit(h) + '</div></span>' +
+          '<button type="button" class="habitmain" data-edit-habit="' + h.id + '" aria-label="Edit ' + esc(h.name) + '">' +
+            '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
+            '<span class="nm"><div class="name">' + esc(h.name) + ' ' + chip + '</div>' +
+              '<div class="meta">' + esc(scheduleLabel(h)) + perWeekNote + ' · ' + streak + Logic.streakUnit(h) + '</div></span>' +
+          '</button>' +
           '<button class="check' + (done ? ' done' : '') + (!req && !done ? ' optional' : '') + '" data-toggle="' + h.id + '"' +
             ' aria-label="' + esc(h.name) + (done ? ': done, tap to undo' : ': mark done') + '" aria-pressed="' + done + '"' +
             ' data-color="' + esc(ink) + '"' +
@@ -617,7 +635,7 @@
       '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="Optional note about this day">' + esc(Store.getNote(iso)) + '</textarea>' +
         '<div class="btnrow" style="margin-top:10px"><button type="button" class="btn ghost" id="seenotes">See all notes</button></div></div>';
 
-    $('#view').dataset.day = today;
+    $('#view').dataset.viewIso = today;
 
     document.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
@@ -631,6 +649,11 @@
       if (nowDone && navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
       Store.toggleCell(iso, id);
       setTimeout(render, 160);
+    }));
+    document.querySelectorAll('[data-edit-habit]').forEach(b => b.addEventListener('click', ev => {
+      if (ev.target.closest('[data-toggle]')) return;
+      ev.preventDefault();
+      openEditor(b.dataset.editHabit);
     }));
     $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
     $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
@@ -803,7 +826,7 @@
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', true);
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest day · tap a day to edit';
+      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to edit';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, accent, 'combined', false);
@@ -881,7 +904,7 @@
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
-          '<li><b>Today</b>: tap the <b>checkmark</b> to log it. Cards are compact check rows. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
+          '<li><b>Today</b>: tap the <b>checkmark</b> to log it. Tap the left side of a habit (icon/name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional <b>note</b> under Today for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
         '</ul>' +
@@ -1323,7 +1346,7 @@
         return '<div class="card" style="margin-top:12px"><h2>Streakmap · ' + rangeLbl + ' · tap to edit any day</h2>' +
           fullMap(h, 52, endISO) +
           '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center">' +
-            '<span>Full color = done · faint = rest day</span>' +
+            '<span>Full color = done · faint = rest or off day</span>' +
             '<span><button class="pagebtn" id="mapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
             '<button class="pagebtn" id="mapnewer"' + (mapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
           '</div></div>';
@@ -1354,7 +1377,7 @@
   function openEditor(id) {
     const h = id ? Store.getHabit(id) : null;
     editDraft = h
-      ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' })) }
+      ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: normalizeSchedule(JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' }))) }
       : { id: null, name: '', emoji: '⭐', color: Store.PALETTE[Store.activeHabits().length % Store.PALETTE.length], schedule: { kind: 'daily' } };
     render();
   }
@@ -1394,6 +1417,7 @@
 
   function wireEditor() {
     const d = editDraft;
+    const root = document.querySelector('#modal .editor') || $('#modal');
     $('#closeedit').addEventListener('click', closeEd);
     $('#canceledit').addEventListener('click', closeEd);
     $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') closeEd(); });
@@ -1401,26 +1425,38 @@
     $('#hname').addEventListener('input', ev => d.name = ev.target.value);
     $('#hname').addEventListener('keydown', ev => { if (ev.key === 'Enter') $('#savehabit').click(); });
     $('#hemoji').addEventListener('input', ev => d.emoji = ev.target.value || '⭐');
-    document.querySelectorAll('[data-emoji]').forEach(b => b.addEventListener('click', () => { d.emoji = b.dataset.emoji; render(); }));
-    document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => { d.color = b.dataset.color; render(); }));
-    document.querySelectorAll('#kindseg [data-kind]').forEach(b => b.addEventListener('click', () => {
+    root.querySelectorAll('[data-emoji]').forEach(b => b.addEventListener('click', () => { d.emoji = b.dataset.emoji; render(); }));
+    root.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => { d.color = b.dataset.color; render(); }));
+    root.querySelectorAll('#kindseg [data-kind]').forEach(b => b.addEventListener('click', () => {
       const k = b.dataset.kind;
-      d.schedule = k === 'daily' ? { kind: 'daily' } : k === 'weekdays' ? { kind: 'weekdays', days: (d.schedule.days || [0, 1, 2, 3, 4]) } : { kind: 'perWeek', target: d.schedule.target || 3 };
+      if (k === 'daily') d.schedule = { kind: 'daily' };
+      else if (k === 'weekdays') {
+        const prev = normalizeSchedule(d.schedule);
+        d.schedule = {
+          kind: 'weekdays',
+          days: (prev.kind === 'weekdays' && prev.days.length) ? prev.days.slice() : [0, 1, 2, 3, 4]
+        };
+      } else {
+        const prev = normalizeSchedule(d.schedule);
+        d.schedule = { kind: 'perWeek', target: prev.kind === 'perWeek' ? prev.target : 3 };
+      }
       render();
     }));
-    document.querySelectorAll('[data-day]').forEach(b => b.addEventListener('click', () => {
+    root.querySelectorAll('.dayschips [data-day]').forEach(b => b.addEventListener('click', () => {
       const i = +b.dataset.day;
-      const days = d.schedule.days || [];
-      d.schedule.days = days.indexOf(i) === -1 ? days.concat([i]).sort() : days.filter(x => x !== i);
+      if (!Number.isInteger(i) || i < 0 || i > 6) return;
+      const days = (d.schedule.days || []).filter(x => Number.isInteger(x) && x >= 0 && x <= 6);
+      d.schedule.days = days.indexOf(i) === -1 ? days.concat([i]).sort((a, b) => a - b) : days.filter(x => x !== i);
       render();
     }));
     const tg = $('#target');
     if (tg) tg.addEventListener('change', ev => d.schedule.target = Math.min(7, Math.max(1, +ev.target.value || 3)));
     $('#savehabit').addEventListener('click', () => {
       if (!d.name.trim()) { alert('Give the habit a name.'); return; }
-      if (d.schedule.kind === 'weekdays' && !(d.schedule.days || []).length) { alert('Pick at least one weekday.'); return; }
-      if (d.id) Store.updateHabit(d.id, { name: d.name.trim(), emoji: d.emoji, color: d.color, schedule: d.schedule });
-      else Store.addHabit({ name: d.name.trim(), emoji: d.emoji, color: d.color, schedule: d.schedule });
+      const schedule = normalizeSchedule(d.schedule);
+      if (schedule.kind === 'weekdays' && !schedule.days.length) { alert('Pick at least one weekday.'); return; }
+      if (d.id) Store.updateHabit(d.id, { name: d.name.trim(), emoji: d.emoji, color: d.color, schedule });
+      else Store.addHabit({ name: d.name.trim(), emoji: d.emoji, color: d.color, schedule });
       editDraft = null; render();
     });
   }
@@ -1471,6 +1507,22 @@
     if (!localStorage.getItem('dc_first_seen_at')) localStorage.setItem('dc_first_seen_at', String(Date.now()));
   } catch (e) {}
   Store.init(() => Sync.schedulePush());
+  /* Repair weekday schedules corrupted by a data-day attribute clash (NaN days). */
+  (function repairHabitSchedules() {
+    let changed = false;
+    Store.get().habits.forEach(h => {
+      if (!h || h.deleted || !h.schedule || h.schedule.kind !== 'weekdays') return;
+      const clean = normalizeSchedule(h.schedule);
+      const before = JSON.stringify(h.schedule.days || []);
+      const after = JSON.stringify(clean.days);
+      if (before !== after) {
+        h.schedule = clean;
+        h.updatedAt = Date.now();
+        changed = true;
+      }
+    });
+    if (changed) Store.save();
+  })();
   Sync.init({
     getDoc: () => Store.get(),
     applyDoc: doc => { Store.replaceState(doc); render(); },
@@ -1506,6 +1558,6 @@
   });
   /* midnight rollover: refresh the Today view when the date changes */
   setInterval(() => {
-    if (activeTab === 'today' && !viewDate && $('#view').dataset.day !== Logic.todayISO()) render();
+    if (activeTab === 'today' && !viewDate && $('#view').dataset.viewIso !== Logic.todayISO()) render();
   }, 60000);
 })();

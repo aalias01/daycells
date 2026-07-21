@@ -321,13 +321,22 @@ nav.tabs button.tab-nudge {
 }
 .hcard.compact { cursor: default; }
 .hcard .top { display: flex; align-items: center; gap: 10px; }
+.hcard .habitmain {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  border: 0; background: transparent; color: inherit; text-align: left; padding: 0; cursor: pointer;
+  border-radius: 8px;
+}
+.hcard .habitmain:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hcard .emoji {
   width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
   font-size: 17px; flex: 0 0 auto; border: 1px solid var(--line);
 }
 .hcard .nm { flex: 1; min-width: 0; }
 .hcard .nm .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14.5px; }
-.hcard .nm .meta { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+.hcard .nm .meta {
+  font-size: 11px; color: var(--muted); font-family: var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* square cell check */
 .hcard .check {
   width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--line);
@@ -551,7 +560,10 @@ button.calcell:active { transform: scale(.96); }
 }
 .anafocushead .grow { flex: 1; min-width: 0; }
 .anafocushead .name { font-weight: 650; font-size: 16px; font-family: var(--font-display); }
-.anafocushead .meta { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+.anafocushead .meta {
+  font-size: 11.5px; color: var(--muted); font-family: var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .stat .v.stat-sm { font-size: 14px; line-height: 1.25; }
 .streakchip {
   display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .03em;

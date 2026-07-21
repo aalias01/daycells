@@ -24,7 +24,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- **Today:** tap the check to log a day. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
+- **Today:** tap the check to log a day. Tap the left side of a habit (icon/name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Today for that day. **See all notes** lists older notes and jumps to that day.
 - **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
