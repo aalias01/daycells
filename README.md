@@ -1,20 +1,20 @@
 # StreakGrid
 
-A habit tracker that runs as a static site. Each habit gets a GitHub-style contribution grid: an 18-week strip on its card, a 52-week map on its detail page, unlimited history behind both. Data lives in the browser (localStorage) and, if you sign in with Google, in one JSON file in your own Drive. No server, no accounts on anyone else's machine, no build step.
+A habit tracker that runs as a static site. Each habit gets a GitHub-style contribution grid: an 18-week strip on its card, a 52-week map on its detail page, unlimited history behind both. No server of yours, no accounts on anyone else's machine, no build step.
 
-## Run
+**Try it:** [https://streakgrid.vercel.app](https://streakgrid.vercel.app)
 
-Open `index.html` in a browser. That's the whole install.
+Anyone can open that URL. Your habits stay in *your* browser on that device. Optional Google Drive sync uses *your* Google account and *your* OAuth Client ID, not the host's. Clearing the site’s browser data wipes unsynced history, so turn on Drive sync or export a backup if you care about durability.
 
-To serve it (needed for Google sign-in):
+## Saving your data
 
-```
-python3 -m http.server 8080
-```
+| How | What it does |
+|-----|----------------|
+| **In the browser (automatic)** | Every check-in is saved on the device as you go. Works with no account. |
+| **Export / import** | Settings → **Export JSON** (full restore later) or **Export CSV** (spreadsheet / pandas). Import JSON from Settings. |
+| **Google Drive sync** | Paste your own OAuth Client ID in Settings, sign in. The app writes one JSON file in a `StreakGrid` folder in *your* Drive. Use this for phone + laptop and for surviving a cache clear. |
 
-To deploy: push the folder to any static host. Vercel and GitHub Pages both work as-is; `vercel.json` is included.
-
-Deployed, it's an installable PWA: a service worker caches the app for offline use and fast loads, and `manifest.webmanifest` plus the bundled icons give it a proper home-screen install on iOS and Android. After changing app files, bump `VERSION` in `sw.js` so clients pick up the new build.
+Drive sync is bring-your-own credentials: leave `js/config.js` empty; each person pastes their Client ID under Settings (stored only in that browser). Do not put the OAuth Client Secret in the app. If you use the shared demo at `https://streakgrid.vercel.app`, add that exact origin to *your* OAuth client's Authorized JavaScript origins. Or deploy your own copy and use your own origin.
 
 ## Use
 
@@ -30,26 +30,36 @@ Streak rules: a streak breaks only when a scheduled day passes unchecked. Rest d
 
 Analytics: per habit, current and best streak, total completions, 7-day and 30-day rates, weekday breakdown, 6-month trend. The Analytics tab adds an all-habit grid and totals.
 
-## Google Drive sync
+On a phone: open the URL → Share → Add to Home Screen for an installable PWA.
 
-Off until you add your own OAuth Client ID. Each person brings their own Google Cloud credentials; leave `js/config.js` empty in shared copies and paste the ID under Settings → OAuth Client ID (stored only in that browser). Setup, once, about five minutes:
+## Google Drive sync (optional, per person)
+
+Off until you add **your own** OAuth Client ID. Setup once, about five minutes, free for normal personal use:
 
 1. [console.cloud.google.com](https://console.cloud.google.com): create a project.
 2. APIs & Services → Library → enable **Google Drive API**.
-3. OAuth consent screen (Google Auth Platform): External; scopes `drive.file` and `userinfo.email`; add yourself as a test user (Testing mode keeps the app personal) or publish if you want anyone to sign in.
-4. Credentials → Create credentials → OAuth client ID → Web application. Add your origins, e.g. `https://yourapp.vercel.app` and `http://localhost:8080`. Do not put the Client Secret in the app; static sites only need the Client ID.
-5. Paste the Client ID into Settings → OAuth Client ID. Optionally set `js/config.js` for a private deploy only; do not commit someone else's ID into a public repo.
+3. Google Auth Platform (OAuth):
+   - **Branding:** app name + your email
+   - **Audience:** External; stay in **Testing** and add your Gmail as a test user (keeps sign-in limited to you), or publish if you want anyone with the Client ID to sign in
+   - **Data Access:** scopes `https://www.googleapis.com/auth/drive.file` and `https://www.googleapis.com/auth/userinfo.email`
+4. **Clients** → Create client → **Web application**. Authorized JavaScript origins: the app URL(s) you will use, e.g. `https://streakgrid.vercel.app` and/or your own deploy URL. Leave redirect URIs empty. Ignore the Client Secret.
+5. In StreakGrid: Settings → paste the Client ID → **Sign in with Google**.
 
-Sign in from Settings. The app creates a `StreakGrid` folder in your Drive containing `streakgrid-data.json`. The `drive.file` scope limits the app to files it created; it cannot read anything else in your Drive. Tokens sit in sessionStorage and expire on their own.
+The app creates a `StreakGrid` folder in your Drive containing `streakgrid-data.json`. The `drive.file` scope limits the app to files it created; it cannot read anything else in your Drive. Tokens sit in sessionStorage and expire on their own.
 
-Sync is offline-first: localStorage is the working copy, Drive is durability, pushes debounce 4 seconds after a change. Merging is conflict-free: habits merge by id with newest-edit-wins and deletion tombstones; every day-cell, rest-day mark, and note carries a timestamp and merges last-write-wins per key.
+Sync is offline-first: the browser is the working copy, Drive is durability, pushes debounce 4 seconds after a change. Merging is conflict-free: habits merge by id with newest-edit-wins and deletion tombstones; every day-cell, rest-day mark, and note carries a timestamp and merges last-write-wins per key.
 
-## Data
+## Deploy your own copy
 
-Nothing is pruned. Every logged day stays, which is the point: the record gets more useful the longer it runs.
+This repo is a static site. Push the folder to Vercel, GitHub Pages, or any static host (`vercel.json` is included). After you change app files, bump `VERSION` in `sw.js` so clients pick up the new build.
 
-- Export JSON: the full state, re-importable.
-- Export CSV log: long format (`date, habit_id, habit_name, value, logged_at`), loads straight into pandas or a spreadsheet.
+For local development (sign-in needs http, not `file://`):
+
+```
+python3 -m http.server 8080
+```
+
+Then add `http://localhost:8080` to your OAuth client's Authorized JavaScript origins.
 
 ## Customize
 
@@ -63,9 +73,9 @@ Nothing is pruned. Every logged day stays, which is the point: the record gets m
 ```
 index.html            shell
 css/style.css         theme (light/dark/manual)
-js/config.js          deployment config (client ID)
+js/config.js          optional private Client ID (leave empty for shared copies)
 js/logic.js           dates, schedules, streaks, analytics (pure, node-testable)
-js/store.js           state, localStorage, migration
+js/store.js           state, browser persistence, migration
 js/gdrive.js          Google Identity Services + Drive file ops
 js/sync.js            offline-first merge sync
 sw.js                 service worker (offline cache; bump VERSION per deploy)
@@ -77,9 +87,10 @@ Vanilla JS. `js/logic.js` and the merge functions in `js/sync.js` run under node
 
 ## Troubleshoot
 
-- Sign-in button does nothing or errors: the app is on `file://`. Serve it over http(s).
-- "No OAuth Client ID configured": add one per the sync section.
-- Popup opens then fails: your current origin isn't in the client ID's authorized JavaScript origins.
-- Data gone after clearing browser storage: localStorage was the only copy. Reconnect Drive to pull the synced copy, or import a JSON export.
+- Sign-in button does nothing or errors: the page must be served over http(s), not opened as a raw file.
+- "No OAuth Client ID configured": paste yours in Settings (see Google Drive sync).
+- Popup opens then fails: your current origin isn't in the Client ID's authorized JavaScript origins.
+- "Access blocked" / not a test user: add your Gmail under Audience → Test users, or publish the OAuth app.
+- Data gone after clearing browser storage: reconnect Drive to pull the synced copy, or import a JSON export.
 - Two devices show different data: both sync to the same Drive account within seconds of a change; check the status dot in the header. Tapping the dot forces a sync.
 - Deployed app shows an old version: the service worker is serving cache. Bump `VERSION` in `sw.js` and redeploy, or hard-refresh.
