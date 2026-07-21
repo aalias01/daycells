@@ -486,14 +486,14 @@
 
     return '<div class="overlay" id="ovl"><div class="sheet calsheet"><div class="grab"></div>' +
       '<div class="calhead">' +
-        '<button type="button" id="calprev" aria-label="previous month">‹</button>' +
+        '<button type="button" class="calnavbtn" id="calprev" aria-label="previous month">‹</button>' +
         '<div class="caltitle">' + esc(monthLabel) + '</div>' +
-        '<button type="button" id="calnext" aria-label="next month"' + (canNext ? '' : ' disabled') + '>›</button>' +
-        '<button type="button" id="calclose" aria-label="close">✕</button>' +
+        '<button type="button" class="calnavbtn" id="calnext" aria-label="next month"' + (canNext ? '' : ' disabled') + '>›</button>' +
+        '<button type="button" class="calnavbtn calclose" id="calclose" aria-label="close">✕</button>' +
       '</div>' +
       '<div class="caldows">' + DOWS.map(d => '<span>' + d + '</span>').join('') + '</div>' +
       '<div class="calgrid">' + cells + '</div>' +
-      '<div class="btnrow"><button class="btn ghost" id="caltoday">Jump to today</button></div>' +
+      '<div class="btnrow calfoot"><button class="btn ghost" id="caltoday">Jump to today</button></div>' +
     '</div></div>';
   }
 
