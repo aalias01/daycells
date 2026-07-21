@@ -32,7 +32,10 @@ Each person brings their own Client ID (Settings field, or empty `js/config.js` 
 3. Google Auth Platform:
    - Branding: app name + your email
    - Audience: External, Testing, add your Gmail as a test user
-   - Data Access: `https://www.googleapis.com/auth/drive.file` and `https://www.googleapis.com/auth/userinfo.email`
+   - Data Access → Add or remove scopes. Use the Filter box:
+     - Filter `userinfo` → check `.../auth/userinfo.email` (shows under non-sensitive)
+     - Filter `drive.file` → check `.../auth/drive.file` (sensitive; will not appear under non-sensitive)
+     - Click **Update** on the panel, then **Save** on the main Data Access page. Update alone does not persist. If Drive scopes are missing, enable Google Drive API first.
 4. Clients → Web application. Authorized JavaScript origins: `https://streakgrid.vercel.app` (and `http://localhost:8080` if you develop locally). No redirect URI. Ignore the Client Secret.
 5. StreakGrid → Settings → paste Client ID → Sign in with Google.
 

@@ -280,7 +280,14 @@
             '<ul>' +
               '<li><b>Branding:</b> app name (e.g. StreakGrid) and your email. Save.</li>' +
               '<li><b>Audience:</b> External. Stay in <b>Testing</b>. Add your Gmail under Test users. Save.</li>' +
-              '<li><b>Data Access → Add or remove scopes:</b> check <code>userinfo.email</code>. Manually add <code>https://www.googleapis.com/auth/drive.file</code>, then Update.</li>' +
+              '<li><b>Data Access → Add or remove scopes:</b> use the <b>Filter</b> box at the top of the panel.' +
+                '<ul>' +
+                  '<li>Filter <code>userinfo</code> → check <code>.../auth/userinfo.email</code> (non-sensitive).</li>' +
+                  '<li>Clear the filter, then filter <code>drive.file</code> → check <code>.../auth/drive.file</code> (sensitive; it will not appear under “non-sensitive”).</li>' +
+                  '<li>If Drive API scopes do not show up, enable <b>Google Drive API</b> first (step 2), then reopen this panel.</li>' +
+                  '<li>Click <b>Update</b> at the bottom of the panel (closes it). Then click <b>Save</b> on the main Data Access page. Update alone does not persist.</li>' +
+                '</ul>' +
+              '</li>' +
             '</ul>' +
           '</li>' +
           '<li><b>Clients → Create client → Web application.</b> Under Authorized JavaScript origins, add the origin shown above. Leave redirect URIs empty. Create. Copy the <b>Client ID</b> only. Ignore the Client Secret.</li>' +
