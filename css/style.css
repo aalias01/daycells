@@ -487,6 +487,18 @@ button.calcell:active { transform: scale(.96); }
   margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: var(--ink);
   font-family: var(--font-mono);
 }
+.heat-day-nav { margin-bottom: 8px; }
+.heat-day-nav .btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 12px 14px;
+}
+.heat-day-nav .btn:disabled { opacity: .35; }
+.yearheatmap-inner .c.jump.heat-day-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}
 .maplegend { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--font-mono); }
 .maplegend .heatswatch {
   display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 1px;

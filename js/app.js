@@ -849,7 +849,7 @@
       c.addEventListener('click', () => {
         /* Laptop: jump immediately. Phone: confirm sheet (avoids accidental navigation). */
         if (heatJumpDirect()) go();
-        else showHeatDaySheet(c, go);
+        else showHeatDaySheet(c);
       });
       c.addEventListener('keydown', ev => {
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
@@ -908,31 +908,91 @@
     if (tip) tip.hidden = true;
   }
 
-  function showHeatDaySheet(el, onOpen) {
+  function showHeatDaySheet(startEl) {
     hideHeatTip();
     hideHeatDaySheet();
-    const tip = el.getAttribute('data-tip') || el.dataset.jumpDay || '';
-    const body = tip.replace(/ · Open in Habits$/, '');
+    let iso = startEl.dataset.jumpDay;
+    if (!iso) return;
+    const today = Logic.todayISO();
+
     const ovl = document.createElement('div');
     ovl.id = 'heat-day-ovl';
     ovl.className = 'overlay';
     ovl.innerHTML =
       '<div class="sheet heat-day-sheet" role="dialog" aria-label="Day details">' +
         '<div class="grab"></div>' +
-        '<p class="heat-day-body">' + esc(body) + '</p>' +
+        '<p class="heat-day-body" id="heat-day-body"></p>' +
+        '<div class="btnrow heat-day-nav">' +
+          '<button type="button" class="btn ghost" id="heat-day-prev" aria-label="Previous day">← Previous</button>' +
+          '<button type="button" class="btn ghost" id="heat-day-next" aria-label="Next day">Next →</button>' +
+        '</div>' +
         '<div class="btnrow">' +
           '<button type="button" class="btn" id="heat-day-open">Open in Habits</button>' +
           '<button type="button" class="btn ghost" id="heat-day-close">Close</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ovl);
+
+    const bodyEl = ovl.querySelector('#heat-day-body');
+    const prevBtn = ovl.querySelector('#heat-day-prev');
+    const nextBtn = ovl.querySelector('#heat-day-next');
+
+    function cellFor(day) {
+      return document.querySelector('#view [data-jump-day="' + day + '"]');
+    }
+
+    function setActiveCell() {
+      document.querySelectorAll('#view [data-jump-day].heat-day-active').forEach(el => {
+        el.classList.remove('heat-day-active');
+      });
+      const cell = cellFor(iso);
+      if (cell) cell.classList.add('heat-day-active');
+    }
+
+    function refresh() {
+      const cell = cellFor(iso);
+      const tip = cell ? (cell.getAttribute('data-tip') || '') : '';
+      const body = tip.replace(/ · Open in Habits$/, '') || iso;
+      bodyEl.textContent = body;
+      const prevIso = Logic.addDays(iso, -1);
+      const nextIso = Logic.addDays(iso, 1);
+      prevBtn.disabled = !cellFor(prevIso);
+      nextBtn.disabled = iso >= today || !cellFor(nextIso);
+      setActiveCell();
+    }
+
+    function openHabits() {
+      if (!iso || iso > today) return;
+      activeTab = 'habits';
+      viewDate = iso >= today ? null : iso;
+      hideHeatDaySheet();
+      render();
+      window.scrollTo(0, 0);
+    }
+
     const close = () => hideHeatDaySheet();
     ovl.addEventListener('click', ev => { if (ev.target.id === 'heat-day-ovl') close(); });
     ovl.querySelector('#heat-day-close').addEventListener('click', close);
-    ovl.querySelector('#heat-day-open').addEventListener('click', () => { close(); onOpen(); });
+    ovl.querySelector('#heat-day-open').addEventListener('click', openHabits);
+    prevBtn.addEventListener('click', () => {
+      const prevIso = Logic.addDays(iso, -1);
+      if (!cellFor(prevIso)) return;
+      iso = prevIso;
+      refresh();
+    });
+    nextBtn.addEventListener('click', () => {
+      const nextIso = Logic.addDays(iso, 1);
+      if (nextIso > today || !cellFor(nextIso)) return;
+      iso = nextIso;
+      refresh();
+    });
+    refresh();
   }
 
   function hideHeatDaySheet() {
+    document.querySelectorAll('#view [data-jump-day].heat-day-active').forEach(el => {
+      el.classList.remove('heat-day-active');
+    });
     const ovl = document.getElementById('heat-day-ovl');
     if (ovl) ovl.remove();
   }
@@ -973,12 +1033,12 @@
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: true });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day for details';
+      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day for details (Previous / Next in the popup on phone)';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: true });
       heatTitle = 'All habits · ' + year;
-      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day for details';
+      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day for details (Previous / Next in the popup on phone)';
     }
 
     const overview = analyticsMode === 'focus'
