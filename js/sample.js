@@ -9,7 +9,7 @@ const Sample = (() => {
     { id: 'h_read', name: 'Read 10 pages', emoji: '📖', color: '#c9a227', schedule: { kind: 'daily' }, order: 2 },
     { id: 'h_gym', name: 'Gym', emoji: '🏋️', color: '#d0703c', schedule: { kind: 'perWeek', target: 3 }, order: 3 },
     { id: 'h_code', name: 'Practice coding', emoji: '💻', color: '#3d9970', schedule: { kind: 'perWeek', target: 4 }, order: 4 },
-    { id: 'h_deep', name: 'Deep work session', emoji: '🎯', color: '#d0703c', schedule: { kind: 'weekdays', days: [0, 1, 2, 3, 4] }, order: 5 },
+    { id: 'h_deep', name: 'Deep work', emoji: '🎯', color: '#d0703c', schedule: { kind: 'weekdays', days: [0, 1, 2, 3, 4] }, order: 5 },
     { id: 'h_bed', name: 'In bed by 10:30', emoji: '🌙', color: '#4c7fae', schedule: { kind: 'daily' }, order: 6 }
   ];
 

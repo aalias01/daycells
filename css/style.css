@@ -677,7 +677,40 @@ button.calcell:active { transform: scale(.96); }
 }
 .set-row.clientidrow { border-bottom: 0; padding-top: 4px; }
 .advbody { margin-top: 8px; padding-top: 4px; border-top: 1px dashed var(--line); }
-.set-row .up, .set-row .down { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; width: 28px; height: 28px; color: var(--ink); }
+.habit-row { flex-wrap: nowrap; touch-action: pan-y; }
+.habit-row.dragging {
+  opacity: .72;
+  background: var(--card);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 10px;
+  position: relative;
+  z-index: 2;
+}
+.drag-handle {
+  flex: 0 0 auto;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 8px;
+  color: var(--muted); cursor: grab; touch-action: none;
+  padding: 0;
+}
+.drag-handle:active { cursor: grabbing; background: var(--bg); }
+.drag-handle .grip {
+  display: block; width: 10px; height: 16px; position: relative;
+}
+.drag-handle .grip::before {
+  content: '';
+  position: absolute; left: 1px; top: 1px;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 5px 0 currentColor,
+    0 10px 0 currentColor,
+    5px 0 0 currentColor,
+    5px 5px 0 currentColor,
+    5px 10px 0 currentColor;
+}
+body.habit-dragging { user-select: none; -webkit-user-select: none; }
 
 textarea.note {
   width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--card);

@@ -137,7 +137,7 @@
     { name: 'No social media scroll', emoji: '📵', color: '#c0442e', schedule: { kind: 'daily' } },
     { name: 'No alcohol', emoji: '🚫', color: '#c0442e', schedule: { kind: 'daily' } },
     { name: 'Plan tomorrow', emoji: '🗓️', color: '#3a9ea5', schedule: { kind: 'daily' } },
-    { name: 'Deep work session', emoji: '🎯', color: '#d0703c', schedule: { kind: 'weekdays', days: [0, 1, 2, 3, 4] } },
+    { name: 'Deep work', emoji: '🎯', color: '#d0703c', schedule: { kind: 'weekdays', days: [0, 1, 2, 3, 4] } },
     { name: 'Practice a language', emoji: '🗣️', color: '#c9a227', schedule: { kind: 'perWeek', target: 5 } },
     { name: 'Practice coding', emoji: '💻', color: '#3d9970', schedule: { kind: 'perWeek', target: 4 } },
     { name: 'Eat a fruit', emoji: '🍎', color: '#c06c9c', schedule: { kind: 'daily' } },
@@ -1113,9 +1113,10 @@
       : '';
 
     const habitRows = Store.activeHabits().map(h =>
-      '<div class="set-row"><span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
-      '<button class="up" data-mv="-1" data-id="' + h.id + '">↑</button>' +
-      '<button class="down" data-mv="1" data-id="' + h.id + '">↓</button>' +
+      '<div class="set-row habit-row" data-habit-id="' + h.id + '">' +
+      '<button type="button" class="drag-handle" data-drag aria-label="Drag to reorder">' +
+        '<span class="grip" aria-hidden="true"></span></button>' +
+      '<span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
       '<button class="btn ghost" data-edit="' + h.id + '">edit</button>' +
       '<button class="btn ghost" data-archive="' + h.id + '">archive</button></div>').join('') || '<div class="mini">No active habits.</div>';
 
@@ -1153,7 +1154,7 @@
         '</span></div>' +
         '<div class="mini">Accent paints chrome and the All-habits year heatmap. Focus one uses each habit\'s color (edit a habit to change it).</div>' +
       '</div>' +
-      '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
+      '<div class="card"><h2>Habits</h2><div id="habitlist">' + habitRows + '</div>' + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
         '<button class="btn" id="exportjson">Export JSON</button>' +
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
@@ -1196,7 +1197,7 @@
     document.querySelectorAll('[data-accent-opt]').forEach(b => b.addEventListener('click', () => {
       Store.setSetting('accent', b.dataset.accentOpt); render();
     }));
-    document.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', () => { Store.moveHabit(b.dataset.id, +b.dataset.mv); render(); }));
+    wireHabitReorder();
     document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
     document.querySelectorAll('[data-archive]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.archive, { archived: true }); render(); }));
     document.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.restore, { archived: false }); render(); }));
@@ -1239,6 +1240,68 @@
       root.innerHTML = detailHTML(h); wireDetail(h); return;
     }
     root.innerHTML = '';
+  }
+
+  /** Pointer drag reorder for Settings → Habits (mouse + touch). */
+  function wireHabitReorder() {
+    const list = $('#habitlist');
+    if (!list || !list.querySelector('.habit-row')) return;
+
+    let dragRow = null;
+    let moved = false;
+
+    function commitOrder() {
+      const ids = Array.from(list.querySelectorAll('.habit-row')).map(r => r.dataset.habitId);
+      Store.reorderHabits(ids);
+    }
+
+    function placeAt(clientY) {
+      const others = Array.from(list.querySelectorAll('.habit-row')).filter(r => r !== dragRow);
+      let insertBefore = null;
+      for (let i = 0; i < others.length; i++) {
+        const rect = others[i].getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) { insertBefore = others[i]; break; }
+      }
+      if (insertBefore) list.insertBefore(dragRow, insertBefore);
+      else list.appendChild(dragRow);
+    }
+
+    function onMove(ev) {
+      if (!dragRow) return;
+      ev.preventDefault();
+      moved = true;
+      placeAt(ev.clientY);
+    }
+
+    function onUp(ev) {
+      if (!dragRow) return;
+      const handle = dragRow.querySelector('[data-drag]');
+      try { if (handle) handle.releasePointerCapture(ev.pointerId); } catch (e) {}
+      dragRow.classList.remove('dragging');
+      document.body.classList.remove('habit-dragging');
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (moved) commitOrder();
+      dragRow = null;
+      moved = false;
+    }
+
+    list.querySelectorAll('[data-drag]').forEach(handle => {
+      handle.addEventListener('pointerdown', ev => {
+        if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+        dragRow = handle.closest('.habit-row');
+        if (!dragRow) return;
+        moved = false;
+        dragRow.classList.add('dragging');
+        document.body.classList.add('habit-dragging');
+        handle.setPointerCapture(ev.pointerId);
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      });
+      handle.addEventListener('click', ev => { ev.preventDefault(); });
+    });
   }
 
   function shiftMonth(ym, delta) {

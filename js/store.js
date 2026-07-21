@@ -130,6 +130,20 @@ const Store = (() => {
     list[i].updatedAt = now(); list[j].updatedAt = now();
     save();
   }
+  /** Reorder active habits to match `orderedIds` (full active list). */
+  function reorderHabits(orderedIds) {
+    if (!orderedIds || !orderedIds.length) return;
+    const t = now();
+    const active = activeHabits();
+    const idSet = new Set(active.map(h => h.id));
+    if (orderedIds.length !== active.length || orderedIds.some(id => !idSet.has(id))) return;
+    orderedIds.forEach((id, i) => {
+      const h = getHabit(id);
+      if (!h) return;
+      if (h.order !== i) { h.order = i; h.updatedAt = t; }
+    });
+    save();
+  }
   function deleteHabit(id) { const h = getHabit(id); if (h) { h.deleted = true; h.updatedAt = now(); save(); } }
 
   // ---------- day mutations ----------
@@ -163,7 +177,7 @@ const Store = (() => {
   const get = () => state;
 
   return { init, get, save, replaceState, PALETTE,
-    activeHabits, archivedHabits, getHabit, addHabit, updateHabit, moveHabit, deleteHabit,
+    activeHabits, archivedHabits, getHabit, addHabit, updateHabit, moveHabit, reorderHabits, deleteHabit,
     toggleCell, toggleSkip, setNote, getNote, setSetting, exportJSON, importJSON, resetAll, migrateV1, blank };
 })();
 
