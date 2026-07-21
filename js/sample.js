@@ -1,4 +1,4 @@
-/* Sample demo document for first-run "Try sample data".
+/* Sample demo document for first-run auto demo.
  * Always ends at Logic.todayISO() so the grids stay current.
  * ~26 weeks of history with per-habit phases (ramps, slumps, hot streaks).
  */

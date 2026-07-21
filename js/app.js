@@ -43,10 +43,10 @@
   let detailId = null;   // open habit detail (legacy sheet; Habits no longer opens it)
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
-  let welcomeOpen = false;
   let sampleRemindOpen = false;
   let sampleWarnOpen = false;
   let sampleWarnPending = null; // fn to run after Skip on modification warning
+  let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
   const SAMPLE_GRACE_MS = 2 * 60 * 1000;
   const SAMPLE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -477,7 +477,10 @@
     hideHeatTip();
     hideHeatDaySheet();
     armSampleSession();
-    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId) {
+    if (demoTourStep >= 1 && demoTourStep <= DEMO_TOUR.length) {
+      activeTab = DEMO_TOUR[demoTourStep - 1].tab;
+    }
+    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId && !demoTourStep) {
       sampleRemindOpen = true;
     }
     const y = window.scrollY; // keep scroll position across re-renders
@@ -499,7 +502,8 @@
     $('#fab').classList.toggle('hidden', activeTab !== 'habits');
     renderModal();
     renderInfoBanner();
-    window.scrollTo(0, y);
+    positionDemoTour();
+    window.scrollTo(0, demoTourStep ? 0 : y);
   }
 
   function lsGet(k) {
@@ -566,6 +570,106 @@
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     sampleWarnPending = null;
+    endDemoTour();
+  }
+
+  const DEMO_TOUR = [
+    {
+      tab: 'habits',
+      target: '#tour-habits',
+      title: 'Demo habits',
+      body: 'This is sample history (~6 months). Tap a check to try logging. Nothing here is your real streak yet.'
+    },
+    {
+      tab: 'settings',
+      target: '#tour-settings',
+      title: 'Settings',
+      body: 'Sign in with Google to sync across devices, and set appearance. Tracking without sign-in still works.'
+    },
+    {
+      tab: 'analytics',
+      target: '#tour-analytics',
+      title: 'Analytics',
+      body: 'Filled tracking looks like this. When you are ready for your own habits, tap Start tracking on the banner below.'
+    }
+  ];
+
+  function endDemoTour() {
+    demoTourStep = 0;
+    const el = document.getElementById('demo-tour');
+    if (el) el.remove();
+  }
+
+  function seedDemoAndStartTour() {
+    try {
+      Store.importJSON(JSON.stringify(Sample.demoDoc()));
+    } catch (e) {
+      alert(e.message || 'Could not load sample data');
+      return false;
+    }
+    try { localStorage.setItem('dc_welcome_seen', '1'); } catch (e) {}
+    lsDel('dc_sample_cleared');
+    markSampleActive();
+    demoTourStep = 1;
+    activeTab = 'habits';
+    presetsOpen = false;
+    sampleRemindOpen = false;
+    sampleWarnOpen = false;
+    return true;
+  }
+
+  function positionDemoTour() {
+    if (!demoTourStep || demoTourStep > DEMO_TOUR.length) {
+      const dead = document.getElementById('demo-tour');
+      if (dead) dead.remove();
+      return;
+    }
+    const step = DEMO_TOUR[demoTourStep - 1];
+    const place = () => {
+      const target = document.querySelector(step.target);
+      let el = document.getElementById('demo-tour');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'demo-tour';
+        el.className = 'demo-tour';
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-modal', 'true');
+        document.body.appendChild(el);
+      }
+      const pad = 8;
+      let holeStyle = 'top:20%;left:8%;width:84%;height:30%';
+      if (target) {
+        const r = target.getBoundingClientRect();
+        holeStyle =
+          'top:' + Math.max(8, r.top - pad) + 'px;' +
+          'left:' + Math.max(8, r.left - pad) + 'px;' +
+          'width:' + Math.min(window.innerWidth - 16, r.width + pad * 2) + 'px;' +
+          'height:' + Math.min(window.innerHeight - 16, r.height + pad * 2) + 'px';
+      }
+      const isLast = demoTourStep === DEMO_TOUR.length;
+      const isFirst = demoTourStep === 1;
+      el.innerHTML =
+        '<div class="demo-tour-hole" style="' + holeStyle + '"></div>' +
+        '<div class="demo-tour-card">' +
+          '<div class="demo-tour-step">' + demoTourStep + ' / ' + DEMO_TOUR.length + '</div>' +
+          '<strong>' + esc(step.title) + '</strong>' +
+          '<p>' + esc(step.body) + '</p>' +
+          '<div class="btnrow">' +
+            (isFirst ? '' : '<button type="button" class="btn ghost" id="tour-back">Back</button>') +
+            '<button type="button" class="btn ghost" id="tour-skip">Skip tour</button>' +
+            '<button type="button" class="btn" id="tour-next">' + (isLast ? 'Got it' : 'Next') + '</button>' +
+          '</div>' +
+        '</div>';
+      const back = el.querySelector('#tour-back');
+      if (back) back.addEventListener('click', () => { demoTourStep = Math.max(1, demoTourStep - 1); render(); });
+      el.querySelector('#tour-skip').addEventListener('click', () => { endDemoTour(); render(); });
+      el.querySelector('#tour-next').addEventListener('click', () => {
+        if (isLast) endDemoTour();
+        else demoTourStep += 1;
+        render();
+      });
+    };
+    requestAnimationFrame(place);
   }
 
   function armSampleSession() {
@@ -581,7 +685,7 @@
   /** Session reminder for later tab sessions (not the tab that just loaded sample). */
   function shouldShowSampleRemind() {
     if (!sampleDataActive()) return false;
-    if (welcomeOpen || sampleWarnOpen) return false;
+    if (demoTourStep || sampleWarnOpen) return false;
     if (sampleRemindSnoozed()) return false;
     if (ssGet('dc_sample_remind_hide') === '1') return false;
     if (ssGet('dc_sample_first_session') === '1') return false;
@@ -614,7 +718,7 @@
     if (!Sync.state().enabled) return false;
     if (syncStatus.s !== 'auth') return false;
     if (ssGet('dc_reconnect_banner_hide') === '1') return false;
-    if (sampleRemindOpen || sampleWarnOpen || welcomeOpen) return false;
+    if (sampleRemindOpen || sampleWarnOpen || demoTourStep) return false;
     return true;
   }
 
@@ -691,7 +795,7 @@
       });
       const startTrack = el.querySelector('#banner-start-tracking');
       if (startTrack) startTrack.addEventListener('click', () => {
-        doResetAll({ confirmKind: 'startTracking' });
+        doResetAll({ skipConfirm: true, confirmKind: 'startTracking' });
       });
       const go = el.querySelector('#banner-settings');
       if (go) go.addEventListener('click', () => {
@@ -715,7 +819,7 @@
 
   async function doResetAll(opts) {
     const skipConfirm = !!(opts && opts.skipConfirm);
-    const resumeWelcome = !!(opts && opts.resumeWelcome);
+    const reseedDemo = !!(opts && (opts.reseedDemo || opts.resumeWelcome));
     const startTracking = !!(opts && opts.confirmKind === 'startTracking');
     const connected = Sync.state().enabled;
     let msg;
@@ -731,7 +835,6 @@
     if (!skipConfirm && !confirm(msg)) return false;
     Store.resetAll();
     clearSampleActive();
-    lsSet('dc_sample_cleared', '1');
     if (connected) {
       try { await Sync.overwriteRemoteBlank(); }
       catch (e) { alert('Local data cleared, but Drive overwrite failed: ' + (e.message || e)); }
@@ -746,14 +849,16 @@
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     sampleWarnPending = null;
-    if (resumeWelcome) {
-      lsDel('dc_welcome_seen');
+    if (reseedDemo) {
+      lsDel('dc_sample_cleared');
       lsDel('dc_presets_seen');
-      welcomeOpen = true;
+      seedDemoAndStartTour();
       presetsOpen = false;
     } else {
-      welcomeOpen = false;
+      lsSet('dc_sample_cleared', '1');
+      try { localStorage.setItem('dc_presets_seen', '1'); } catch (e) {}
       presetsOpen = true;
+      endDemoTour();
     }
     render();
     return true;
@@ -814,7 +919,9 @@
           (isToday ? '' : '<button id="jumptoday" aria-label="back to today">today</button>') +
         '</span>' +
       '</div>' +
+      '<div id="tour-habits">' +
       cards +
+      '</div>' +
       '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="Optional note about this day">' + esc(Store.getNote(iso)) + '</textarea>' +
         '<div class="btnrow" style="margin-top:10px"><button type="button" class="btn ghost" id="seenotes">See all notes</button></div></div>';
 
@@ -1103,6 +1210,7 @@
         ) + '</div>';
 
     $('#view').innerHTML =
+      '<div id="tour-analytics">' +
       '<div class="card"><h2>View</h2>' + modeSeg + focusChips + '</div>' +
       '<div class="ana-break" role="separator"><span>Analytics</span></div>' +
       '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
@@ -1113,7 +1221,8 @@
           (analyticsMode === 'all' ? heatLegendHTML() + '<br>' : '') +
           heatLegendNote +
         '</div></div>' +
-      body;
+      body +
+      '</div>';
 
     wireAnalytics(habits);
   }
@@ -1186,8 +1295,8 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner (or Settings → <b>Reset all</b>) before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
-        '<p class="mini">First visit can load sample habits (~6 months of demo history). To try sample again later, Settings → <b>Reset all</b> brings back the welcome sheet. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
+        '<p class="mini">First visit loads demo habits automatically (~6 months of history) and a short tour (Habits → Settings → Analytics). Settings → <b>Reset all</b> reloads the demo. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -1258,7 +1367,7 @@
         '<span class="grip" aria-hidden="true"></span></button>' +
       '<span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
       '<button class="btn ghost" data-edit="' + h.id + '">edit</button>' +
-      '<button class="btn ghost" data-archive="' + h.id + '">archive</button></div>').join('') || '<div class="mini">No active habits.</div>';
+      '<button class="btn ghost" data-archive="' + h.id + '">Delete</button></div>').join('') || '<div class="mini">No active habits.</div>';
 
     const archivedRows = Store.archivedHabits().map(h =>
       '<div class="set-row"><span class="grow" style="opacity:.6">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
@@ -1266,7 +1375,7 @@
       '<button class="btn ghost" data-del="' + h.id + '">delete</button></div>').join('');
 
     $('#view').innerHTML =
-      '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
+      '<div class="card" id="tour-settings"><h2>Google Drive sync</h2>' + driveBody +
         clientBlock +
         '<button type="button" class="linkish" id="clientidadv" style="margin-top:10px">' +
           (clientIdAdvanced ? 'Hide Advanced' : 'Advanced: override Client ID') +
@@ -1300,7 +1409,7 @@
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If you tried sample data, use the banner <b>Start tracking</b> (or <b>Reset all</b> here) before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then offers the welcome sheet again (Try sample or Skip).</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use the banner <b>Start tracking</b> before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again.</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -1341,9 +1450,7 @@
     document.querySelectorAll('[data-archive]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.archive, { archived: true }); render(); }));
     document.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.restore, { archived: false }); render(); }));
     document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
-      gateSampleMod(() => {
-        if (confirm('Delete this habit and keep its history out of view? This propagates to synced devices.')) { Store.deleteHabit(b.dataset.del); render(); }
-      });
+      gateSampleMod(() => { Store.deleteHabit(b.dataset.del); render(); });
     }));
     $('#exportjson').addEventListener('click', () => download('daycells-' + Logic.todayISO() + '.json', Store.exportJSON(), 'application/json'));
     $('#exportcsv').addEventListener('click', () => {
@@ -1363,7 +1470,7 @@
       download('daycells-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
-    $('#reset').addEventListener('click', () => { doResetAll({ resumeWelcome: true }); });
+    $('#reset').addEventListener('click', () => { doResetAll({ reseedDemo: true }); });
   }
 
   // ---------- detail + editor + sample prompts + calendar modals ----------
@@ -1372,7 +1479,6 @@
     if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
     if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
-    if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
     if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); return; }
     if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
@@ -1387,7 +1493,7 @@
   function sampleRemindHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Sample data is loaded</h2>' +
-      '<p>This history is demo data. Reset all to start clean before tracking real habits.</p>' +
+      '<p>This history is demo data. Tap <b>Start tracking</b> on the banner when you are ready for your own habits.</p>' +
       '<div class="btnrow">' +
         '<button type="button" class="btn" id="sample-remind-reset">Reset all</button>' +
         '<button type="button" class="btn ghost" id="sample-remind-hide">Hide</button>' +
@@ -1584,50 +1690,6 @@
     }));
   }
 
-  // ---------- first-run sample prompt + post-sample toast ----------
-  function welcomeHTML() {
-    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
-      '<h2>Try sample data?</h2>' +
-      '<div class="btnrow">' +
-        '<button type="button" class="btn" id="welcome-sample">Try sample</button>' +
-        '<button type="button" class="btn ghost" id="welcome-skip">Skip</button>' +
-      '</div>' +
-      '<p class="mini">Explore the demo, then tap <b>Start tracking</b> on the banner when you are ready for your own habits.</p>' +
-    '</div></div>';
-  }
-
-  function markWelcomeSeen() {
-    try {
-      localStorage.setItem('dc_welcome_seen', '1');
-      localStorage.setItem('dc_presets_seen', '1');
-    } catch (e) {}
-  }
-
-  function wireWelcome() {
-    $('#welcome-skip').addEventListener('click', () => {
-      markWelcomeSeen();
-      lsSet('dc_sample_cleared', '1');
-      welcomeOpen = false;
-      presetsOpen = true;
-      render();
-    });
-    $('#welcome-sample').addEventListener('click', () => {
-      try {
-        Store.importJSON(JSON.stringify(Sample.demoDoc()));
-      } catch (e) {
-        alert(e.message || 'Could not load sample data');
-        return;
-      }
-      markWelcomeSeen();
-      welcomeOpen = false;
-      presetsOpen = false;
-      activeTab = 'habits';
-      markSampleActive();
-      render();
-    });
-    /* Do not dismiss by tapping the dim overlay — force a choice. */
-  }
-
   // ---------- preset picker ----------
   function presetsHTML() {
     const existing = new Set(Store.activeHabits().map(h => h.name.toLowerCase()));
@@ -1812,7 +1874,9 @@
         '<button data-kind="perWeek" class="' + (s.kind === 'perWeek' ? 'on' : '') + '">X per week</button></div>' +
       schedUI +
       '<div class="btnrow"><button class="btn" id="savehabit">' + (d.id ? 'Save' : 'Add habit') + '</button>' +
-      '<button class="btn ghost" id="canceledit">Cancel</button></div>' +
+      '<button class="btn ghost" id="canceledit">Cancel</button>' +
+      (d.id ? '<button class="btn danger" id="delhabit">Delete</button>' : '') +
+      '</div>' +
     '</div></div>';
   }
 
@@ -1860,6 +1924,12 @@
       else Store.addHabit({ name: d.name.trim(), emoji: d.emoji, color: d.color, schedule });
       editDraft = null; render();
     });
+    const del = $('#delhabit');
+    if (del) del.addEventListener('click', () => {
+      Store.updateHabit(d.id, { archived: true });
+      editDraft = null;
+      render();
+    });
   }
 
   // ---------- misc ----------
@@ -1886,8 +1956,7 @@
   $('#tabs').addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
-    /* Keep welcome sheet open until Try/Skip — avoids flash when switching tabs. */
-    if (welcomeOpen) return;
+    if (demoTourStep) return;
     switchTab(b.dataset.tab, true);
   });
 
@@ -1895,7 +1964,7 @@
   let tabSlideBusy = false;
 
   function switchTab(tab, allowSame) {
-    if (!tab || welcomeOpen) return;
+    if (!tab || demoTourStep) return;
     if (!allowSame && tab === activeTab) return;
     activeTab = tab;
     detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
@@ -1916,7 +1985,7 @@
 
   /** Swipe tab change: slide page out, swap, slide in. Tab clicks stay instant via switchTab. */
   async function switchTabSlide(tab, dir) {
-    if (!tab || welcomeOpen || tab === activeTab || tabSlideBusy) return;
+    if (!tab || demoTourStep || tab === activeTab || tabSlideBusy) return;
     if (preferReducedMotion()) { switchTab(tab); return; }
     const view = $('#view');
     if (!view) { switchTab(tab); return; }
@@ -1958,8 +2027,8 @@
 
     function sheetOpen() {
       return !!(document.querySelector('.overlay') || document.getElementById('heat-day-ovl') ||
-        sampleRemindOpen || sampleWarnOpen ||
-        welcomeOpen || presetsOpen || notesOpen || calOpen || editDraft || detailId);
+        sampleRemindOpen || sampleWarnOpen || demoTourStep ||
+        presetsOpen || notesOpen || calOpen || editDraft || detailId);
     }
 
     main.addEventListener('touchstart', ev => {
@@ -1992,12 +2061,12 @@
   }
   wireTabSwipe();
   $('#fab').addEventListener('click', () => {
-    if (welcomeOpen || sampleRemindOpen || sampleWarnOpen) return;
+    if (demoTourStep || sampleRemindOpen || sampleWarnOpen) return;
     gateSampleMod(() => { presetsOpen = true; render(); });
   });
   /* sync dot doubles as a manual sync / reconnect button */
   $('#syncdot').addEventListener('click', async () => {
-    if (welcomeOpen) return;
+    if (demoTourStep) return;
     if (!Sync.state().enabled) { activeTab = 'settings'; render(); return; }
     try {
       if (syncStatus.s === 'auth' || !GDrive.cachedToken()) {
@@ -2043,10 +2112,9 @@
     }
   });
   render();
-  /* first run: sample prompt once when empty; Skip opens presets */
-  if (!Store.activeHabits().length && !localStorage.getItem('dc_welcome_seen')) {
-    welcomeOpen = true;
-    render();
+  /* First visit: auto-load demo + tour. After Start tracking: empty → presets. */
+  if (!Store.activeHabits().length && lsGet('dc_sample_cleared') !== '1') {
+    if (seedDemoAndStartTour()) render();
   } else if (!Store.activeHabits().length && !localStorage.getItem('dc_presets_seen')) {
     localStorage.setItem('dc_presets_seen', '1');
     presetsOpen = true;

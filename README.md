@@ -23,12 +23,12 @@ Daycells is licensed under the [MIT License](LICENSE) (Copyright 2026 Alvin Alia
 
 The OAuth **Client ID** identifies the app/project. The **signed-in Google account** owns the Drive file. Two people can share one Client ID and still get separate Drive files if each signs in with their own Gmail.
 
-Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes). After reopen, if Google blocks a quiet reconnect (common on iPhone), Drive pauses until you tap **Reconnect**; local checks keep working.
+Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes). **First sign-in** (this browser was not connected yet): if Drive already has habits, this device adopts the Drive copy and does not append unsigned local habits. **Reconnect** while already signed in (or after Drive pauses) merges local checks with Drive so offline edits are kept. After reopen, if Google blocks a quiet reconnect (common on iPhone), Drive pauses until you tap **Reconnect**; local checks keep working.
 
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
+- **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Delete** in the editor (or Settings → Habits) archives the habit; restore or permanently delete under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
 - **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
@@ -42,7 +42,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
-- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Demo history only: tap **Start tracking** on the sample banner (clears demo and opens the habit picker) before tracking your own habits. While sample is loaded, later sessions show a reminder (**Hide** / **Hide for 7 days** / **Reset all**). After a short explore window on the first session, edits warn until you clear sample. Google sync nudge stays off until sample is cleared. Bottom banner also explains sample (**Start tracking** or **Hide**). Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then shows the welcome sheet again (only way to try sample later). Export first if you want a backup.
+- **Sample data:** first visit auto-loads demo habits (~6 months of history) and a short spotlight tour (Habits → Settings → Analytics). Soft banner **Start tracking** clears the demo and opens the habit picker (no second confirm). While sample is loaded, later sessions show a reminder (**Hide** / **Hide for 7 days** / **Reset all**). After a short explore window on the first session, edits warn until you clear sample. Google sync nudge stays off until sample is cleared. Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then reloads the demo (and tour). Export first if you want a backup.
 
 ## Install (home screen)
 

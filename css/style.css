@@ -397,6 +397,62 @@ nav.tabs button.tab-nudge {
   display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; align-items: stretch;
 }
 .info-banner-actions .btn { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+
+.demo-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  pointer-events: none;
+}
+.demo-tour-hole {
+  position: absolute;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(18, 22, 29, 0.55);
+  pointer-events: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+.demo-tour-card {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+  text-align: left;
+}
+.demo-tour-card strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.demo-tour-card p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.demo-tour-step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.demo-tour-card .btnrow { margin-top: 4px; justify-content: flex-end; }
+body.has-info-banner .demo-tour-card {
+  bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+}
 .calhead {
   display: grid; grid-template-columns: 40px 1fr 40px 40px;
   align-items: center; gap: 4px; margin-bottom: 14px;

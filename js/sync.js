@@ -10,6 +10,9 @@
  *
  * Auth: background pushes never call GIS. Silent re-auth only via silentBoot
  * on resume/foreground. Interactive reconnect only from a user gesture.
+ *
+ * First connect (sync was off): if Drive already has habits, adopt remote only —
+ * do not merge unsigned local data into an existing file. Reconnect / later syncs merge.
  */
 const Sync = (() => {
   const ENABLED_KEY = 'dc_sync_enabled';
@@ -97,12 +100,18 @@ const Sync = (() => {
     return hb + '|' + keyed(doc.cells) + '|' + keyed(doc.skips) + '|' + keyed(doc.notes) + '|' + (doc.settingsUpdatedAt || 0);
   }
 
+  function remoteHasData(doc) {
+    return ((doc && doc.habits) || []).some(h => h && h.id && !h.deleted);
+  }
+
   // ---------- sync cycles ----------
-  async function fullSync(interactive) {
+  /** opts.adoptRemote: first-connect only — replace local with Drive when remote has habits. */
+  async function fullSync(interactive, opts) {
     if (running) { queued = true; return; }
     running = true;
     setStatus('syncing');
     const wantInteractive = !!interactive;
+    const adoptRemote = !!(opts && opts.adoptRemote);
     try {
       if (!fileId) {
         const r = await GDrive.ensureFile(deps.getDoc(), wantInteractive);
@@ -110,6 +119,12 @@ const Sync = (() => {
         if (r.created) { done('ok'); return; }
       }
       const remote = await GDrive.readFile(fileId, wantInteractive).catch(() => ({ version: 2, habits: [], cells: {}, skips: {}, notes: {} }));
+      if (adoptRemote && remoteHasData(remote)) {
+        deps.applyDoc(remote);
+        dirtyPending = false;
+        done('ok');
+        return;
+      }
       const { doc, differsFromLocal, differsFromRemote } = mergeDocs(deps.getDoc(), remote);
       if (differsFromLocal) deps.applyDoc(doc);
       if (differsFromRemote) await GDrive.writeFile(fileId, doc, wantInteractive);
@@ -178,10 +193,11 @@ const Sync = (() => {
   async function connect() {
     await GDrive.getToken(true);
     const email = await GDrive.userEmail();
+    const wasEnabled = localStorage.getItem(ENABLED_KEY) === '1';
     localStorage.setItem(ENABLED_KEY, '1');
     localStorage.setItem(EMAIL_KEY, email);
     dirtyPending = false;
-    await fullSync(true);
+    await fullSync(true, wasEnabled ? undefined : { adoptRemote: true });
     return email;
   }
 
