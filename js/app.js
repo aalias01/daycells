@@ -817,8 +817,8 @@
       '<h2>Sample data loaded</h2>' +
       '<p class="lead">Explore the grids, or start fresh with Reset all. You can always Reset later in Settings.</p>' +
       '<div class="btnrow">' +
+        '<button type="button" class="btn" id="sample-skip">Explore</button>' +
         '<button type="button" class="btn danger" id="sample-reset">Reset all</button>' +
-        '<button type="button" class="btn ghost" id="sample-skip">Skip</button>' +
       '</div>' +
     '</div></div>';
   }
