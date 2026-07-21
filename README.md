@@ -32,13 +32,13 @@ Analytics: per habit, current and best streak, total completions, 7-day and 30-d
 
 ## Google Drive sync
 
-Off until an OAuth Client ID exists. Setup, once, about five minutes:
+Off until you add your own OAuth Client ID. Each person brings their own Google Cloud credentials; leave `js/config.js` empty in shared copies and paste the ID under Settings → OAuth Client ID (stored only in that browser). Setup, once, about five minutes:
 
 1. [console.cloud.google.com](https://console.cloud.google.com): create a project.
 2. APIs & Services → Library → enable **Google Drive API**.
-3. OAuth consent screen: External; add scopes `drive.file` and `userinfo.email`; add yourself as a test user or publish.
-4. Credentials → Create credentials → OAuth client ID → Web application. Add your origins, e.g. `https://yourapp.vercel.app` and `http://localhost:8080`.
-5. Paste the client ID into `js/config.js`, or into Settings → OAuth Client ID inside the app.
+3. OAuth consent screen (Google Auth Platform): External; scopes `drive.file` and `userinfo.email`; add yourself as a test user (Testing mode keeps the app personal) or publish if you want anyone to sign in.
+4. Credentials → Create credentials → OAuth client ID → Web application. Add your origins, e.g. `https://yourapp.vercel.app` and `http://localhost:8080`. Do not put the Client Secret in the app; static sites only need the Client ID.
+5. Paste the Client ID into Settings → OAuth Client ID. Optionally set `js/config.js` for a private deploy only; do not commit someone else's ID into a public repo.
 
 Sign in from Settings. The app creates a `StreakGrid` folder in your Drive containing `streakgrid-data.json`. The `drive.file` scope limits the app to files it created; it cannot read anything else in your Drive. Tokens sit in sessionStorage and expire on their own.
 
