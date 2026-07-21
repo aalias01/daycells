@@ -152,7 +152,18 @@
 
   function fullMap(h, weeks, endISO) {
     const ink = gridInk(h);
-    const cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, endISO || Logic.todayISO());
+    const upto = endISO || Logic.todayISO();
+    let cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, upto);
+    /* Drop leading empty weeks before the habit's first activity so short histories
+       (e.g. sample data) are not a blank left scroll of unused columns. */
+    const start = Logic.habitStartDate(h, state.cells);
+    if (start && cols.length) {
+      const firstWk = Logic.weekStartOf(start);
+      const windowEnd = cols[cols.length - 1][0].iso;
+      if (firstWk <= windowEnd) {
+        while (cols.length > 1 && cols[0][0].iso < firstWk) cols.shift();
+      }
+    }
     const today = Logic.todayISO();
     return '<div class="gridfull">' + cols.map(col =>
       '<div class="col">' + col.map(c => {
@@ -484,7 +495,7 @@
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional: add a one-line <b>note</b> under Today for that day.</li>' +
         '</ul>' +
-        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. Strength (0–100) is a rolling score with a ~2-week memory.</p>' +
+        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory).</p>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       driveCard +
@@ -891,6 +902,7 @@
         '<div class="stat"><div class="v">' + (r30 === null ? '·' : Math.round(r30 * 100) + '%') + '</div><div class="k">30-day rate</div></div>' +
         '<div class="stat"><div class="v">' + Math.round(stg * 100) + '</div><div class="k">strength</div></div>' +
       '</div>' +
+      '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days. Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>' +
       (() => {
         const today = Logic.todayISO();
         const endISO = Logic.addDays(today, -364 * mapPage);
@@ -925,6 +937,9 @@
       if (c.dataset.cell > Logic.todayISO()) return;
       Store.toggleCell(c.dataset.cell, h.id); render();
     }));
+    /* Narrow sheets: keep the newest weeks in view (GitHub-style left=older). */
+    const gf = document.querySelector('#ovl .gridfull');
+    if (gf) gf.scrollLeft = gf.scrollWidth;
   }
 
   function openEditor(id) {
