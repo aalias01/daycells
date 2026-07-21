@@ -10,7 +10,8 @@
  * auth only via getToken(true) from a user gesture.
  */
 const GDrive = (() => {
-  const SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const SCOPE = DRIVE_SCOPE + ' https://www.googleapis.com/auth/userinfo.email';
   const FILE_NAME = 'daycells-data.json';
   const FOLDER_NAME = 'Daycells';
   const LEGACY_FILE = 'streakgrid-data.json';
@@ -21,11 +22,28 @@ const GDrive = (() => {
   const LEGACY_CLIENT = 'sg_gclient';
   const SILENT_COOLDOWN_MS = 60 * 1000;
   const NEEDS_AUTH = 'needs-auth';
+  const MISSING_DRIVE =
+    'Google Drive permission was not granted. Sign in again and allow Drive access.';
 
   let tokenClient = null;
   let pending = null;
   let memToken = null; // { token, exp }
   let lastSilentAt = 0;
+
+  /** Google granular consent: email can succeed while Drive stays unchecked. */
+  function hasDriveScope(resp) {
+    if (libReady() && typeof google.accounts.oauth2.hasGrantedAllScopes === 'function') {
+      try {
+        return google.accounts.oauth2.hasGrantedAllScopes(resp, DRIVE_SCOPE);
+      } catch (e) { /* fall through */ }
+    }
+    const s = (resp && resp.scope) || '';
+    return s.split(/\s+/).indexOf(DRIVE_SCOPE) !== -1;
+  }
+
+  function isInsufficientScopeMsg(msg) {
+    return /insufficient.*scope/i.test(msg || '');
+  }
 
   function migrateClientPref() {
     try {
@@ -105,6 +123,10 @@ const GDrive = (() => {
         const p = pending; pending = null;
         if (!p) return;
         if (resp && resp.access_token) {
+          if (!hasDriveScope(resp)) {
+            p.reject(new Error(MISSING_DRIVE));
+            return;
+          }
           p.resolve(cacheToken(resp.access_token, resp.expires_in));
         } else p.reject(new Error((resp && resp.error) || 'Sign-in failed'));
       },
@@ -131,12 +153,13 @@ const GDrive = (() => {
   /**
    * interactive true: user gesture — may show GIS UI.
    * interactive false: cached token only; never calls requestAccessToken.
+   * forceConsent: prompt=consent (re-ask scopes after a partial grant).
    */
-  function getToken(interactive) {
+  function getToken(interactive, forceConsent) {
     const t = cachedToken();
-    if (t) return Promise.resolve(t);
+    if (t && !forceConsent) return Promise.resolve(t);
     if (!interactive) return Promise.reject(new Error(NEEDS_AUTH));
-    return requestToken('');
+    return requestToken(forceConsent ? 'consent' : '');
   }
 
   /** Single silent GIS attempt (prompt:none). Rate-limited; visibility-gated. */
@@ -160,18 +183,38 @@ const GDrive = (() => {
   }
 
   // ---------- authorized fetch ----------
+  async function readErrorMessage(res, fallback) {
+    let msg = fallback || ('Drive error ' + res.status);
+    try {
+      const j = await res.json();
+      if (j.error && j.error.message) msg = j.error.message;
+    } catch (e) { /* ignore */ }
+    return msg;
+  }
+
   async function gfetch(url, opts, interactive) {
     const wantInteractive = !!interactive;
     let token = await getToken(wantInteractive);
     let res = await fetch(url, withAuth(opts, token));
-    if (res.status === 401) {
-      clearCachedToken();
-      token = await getToken(wantInteractive);
-      res = await fetch(url, withAuth(opts, token));
+    if (res.status === 401 || res.status === 403) {
+      let msg = '';
+      let scopeIssue = false;
+      if (res.status === 403) {
+        msg = await readErrorMessage(res.clone(), '');
+        scopeIssue = isInsufficientScopeMsg(msg);
+      }
+      if (res.status === 401 || scopeIssue) {
+        clearCachedToken();
+        if (!wantInteractive) {
+          throw new Error(scopeIssue ? (msg || MISSING_DRIVE) : NEEDS_AUTH);
+        }
+        token = await getToken(true, scopeIssue);
+        res = await fetch(url, withAuth(opts, token));
+      }
     }
     if (!res.ok) {
-      let msg = 'Drive error ' + res.status;
-      try { const j = await res.json(); if (j.error && j.error.message) msg = j.error.message; } catch (e) {}
+      const msg = await readErrorMessage(res, 'Drive error ' + res.status);
+      if (isInsufficientScopeMsg(msg)) clearCachedToken();
       throw new Error(msg);
     }
     return res;

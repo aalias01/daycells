@@ -53,7 +53,8 @@ const Sync = (() => {
 
   function isAuthErr(err) {
     const m = (err && err.message) || '';
-    return m === GDrive.NEEDS_AUTH || /sign-in|401|none|credential|needs-auth/i.test(m);
+    return m === GDrive.NEEDS_AUTH ||
+      /sign-in|401|none|credential|needs-auth|insufficient|scope|Drive permission was not granted/i.test(m);
   }
 
   // ---------- pure merge (unit-tested) ----------
@@ -158,21 +159,30 @@ const Sync = (() => {
     setStatus('pending');
   }
 
-  /* After Reset all: write blank local doc to Drive without merging (merge would resurrect remote data). */
+  /* After Reset all: write a blank doc to Drive without merging (merge would resurrect remote data).
+   * Always interactive — Reset all is a user gesture, so GIS can re-prompt for missing Drive scope.
+   * Caller should invoke this before clearing local when sync is enabled.
+   */
   async function overwriteRemoteBlank() {
     if (!state().enabled) return;
     clearTimeout(timer);
     timer = null;
     queued = false;
-    const blank = deps.getDoc();
+    const blank = {
+      version: 2,
+      updatedAt: Date.now(),
+      habits: [],
+      cells: {},
+      skips: {},
+      notes: {},
+      settings: { weekStart: 1, theme: 'light', accent: 'cobalt' },
+      settingsUpdatedAt: 0
+    };
     setStatus('syncing');
     try {
-      if (!GDrive.cachedToken()) {
-        setStatus('auth', AUTH_DETAIL);
-        throw new Error(GDrive.NEEDS_AUTH);
-      }
+      await GDrive.getToken(true);
       if (!fileId) {
-        const r = await GDrive.ensureFile(blank, false);
+        const r = await GDrive.ensureFile(blank, true);
         fileId = r.fileId;
         if (r.created) {
           lastSync = Date.now();
@@ -180,7 +190,7 @@ const Sync = (() => {
           return;
         }
       }
-      await GDrive.writeFile(fileId, blank, false);
+      await GDrive.writeFile(fileId, blank, true);
       lastSync = Date.now();
       setStatus('ok');
     } catch (err) {

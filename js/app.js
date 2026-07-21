@@ -863,12 +863,16 @@
       msg = 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
     }
     if (!skipConfirm && !confirm(msg)) return false;
+    if (connected) {
+      try {
+        await Sync.overwriteRemoteBlank();
+      } catch (e) {
+        alert('Drive overwrite failed; local data was not cleared. ' + (e.message || e));
+        return false;
+      }
+    }
     Store.resetAll();
     clearSampleActive();
-    if (connected) {
-      try { await Sync.overwriteRemoteBlank(); }
-      catch (e) { alert('Local data cleared, but Drive overwrite failed: ' + (e.message || e)); }
-    }
     notesOpen = false;
     activeTab = 'habits';
     detailId = null;

@@ -80,15 +80,16 @@ About five minutes. Free for normal personal use. Use this section when you **cr
    - **Or** Daycells → Settings → **Advanced: override Client ID** → paste → **Sign in with Google**.
 6. Confirm Google Drive has folder **Daycells** / file **daycells-data.json**. On another device: same account, Sign in (override paste once per browser if you are not using env inject).
 
-### Optional: Data Access (scopes in the console)
+### Data Access (scopes in the console)
 
 Data Access is part of the same OAuth project. It lists which permissions the app may request (`userinfo.email`, `drive.file`).
 
-- **Not required for Testing sign-in.** Daycells requests those scopes in code when you click Sign in. Google can show the consent popup and grant access even if Data Access is empty.
+- **Recommended for Testing**, and required before you **publish** the OAuth app. Registering scopes keeps the console aligned with what Daycells requests in code.
+- Daycells also requests those scopes when you click Sign in. Google’s consent screen can still appear if Data Access is empty, but registering them avoids surprises.
 - **Signing in does not auto-fill Data Access.** The console tables stay empty until you add scopes and Save.
-- **Still worth doing** so the console matches reality, and before you **publish** the OAuth app.
+- Google’s **granular consent** screen lists Drive as its own checkbox (often unchecked by default). Daycells requires Drive; if you continue without it, sign-in is rejected and sync will not enable.
 
-If you want it registered:
+To register scopes:
 
 1. Google Auth Platform → **Data Access** → **Add or remove scopes**.
 2. Use **Filter**: `userinfo` → check `.../auth/userinfo.email`. Then filter `drive.file` → check `.../auth/drive.file`. (Both often appear under **Your non-sensitive scopes** after save. If `drive.file` is missing from the picker, enable Google Drive API first and reopen the panel.)
@@ -160,11 +161,18 @@ images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 - "No OAuth Client ID configured": set `GOOGLE_CLIENT_ID` on the deploy, or paste under Settings → Advanced (creating one is in this README).
 - Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://daycells.vercel.app`).
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
+- **"Google Drive permission was not granted"** on Sign in: Google’s consent screen left Drive unchecked. Sign in again and allow Drive access.
+- **"Drive overwrite failed" / "insufficient authentication scopes"** on Reset all: this browser was signed in without Drive scope (granular consent). Local data is left intact. Fix:
+  1. Settings → Google Drive → **Sign out**.
+  2. Google Account → [Third-party access](https://myaccount.google.com/connections) → remove Daycells (or the OAuth app name).
+  3. Recommended: Cloud Console → Data Access → add `userinfo.email` and `drive.file`, then Save.
+  4. Sign in again and **check the Google Drive permission**.
+  5. Confirm sync (check a habit or open Drive → `Daycells/daycells-data.json`), then retry **Reset all**.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync dot (or Reconnect on the banner if Drive sync is paused).
 - Drive sync paused after reopen (common on iPhone): checks still save locally; tap **Reconnect** on the banner or the header sync dot. Google may require a user tap; background reconnect is not always allowed.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
 - No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
 - iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.
-- Want Data Access filled in: add scopes manually (optional section above). Sign-in will not populate that page for you.
+- Want Data Access filled in: add scopes manually (Data Access section above). Sign-in will not populate that page for you.
 - Fork Sign in does nothing useful with someone else’s Client ID on your domain: create your own Web client and origins.
