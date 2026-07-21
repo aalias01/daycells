@@ -482,34 +482,36 @@ button.calcell:active { transform: scale(.96); }
   flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
+  justify-content: space-between;
 }
 .set-row.accentrow .set-label {
   flex: 0 0 auto;
   min-width: 0;
 }
 .seg.accentseg {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
   margin-top: 0;
+  margin-left: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content);
   grid-template-rows: repeat(2, auto);
 }
 .seg.accentseg button {
   flex: none;
+  width: auto;
   min-width: 0;
-  width: 100%;
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: 14px auto;
   align-items: center;
+  justify-content: start;
   column-gap: 5px;
-  padding: 7px 6px;
+  padding: 7px 10px;
   font-size: 11px;
   text-align: left;
 }
 .accentseg .alabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .accentseg .swatch {
