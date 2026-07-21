@@ -651,7 +651,7 @@
       : kind === 'reconnect' ? 'Drive sync paused'
       : 'Sync across devices';
     const body = kind === 'sample'
-      ? 'Demo history only. Reset all before tracking your own habits.'
+      ? 'Ready to track for real? This clears the demo so you can add your own habits.'
       : kind === 'reconnect'
         ? 'Checks still save on this device. Tap Reconnect to resume Google Drive.'
         : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
@@ -661,6 +661,7 @@
         '<span>' + body + '</span>' +
       '</div>' +
       '<div class="info-banner-actions">' +
+        (kind === 'sample' ? '<button type="button" class="btn" id="banner-start-tracking">Start tracking</button>' : '') +
         (kind === 'signin' ? '<button type="button" class="btn" id="banner-settings">Settings</button>' : '') +
         (kind === 'reconnect' ? '<button type="button" class="btn" id="banner-reconnect">Reconnect</button>' : '') +
         '<button type="button" class="btn ghost" id="banner-hide">Hide</button>' +
@@ -688,6 +689,10 @@
         }
         render();
       });
+      const startTrack = el.querySelector('#banner-start-tracking');
+      if (startTrack) startTrack.addEventListener('click', () => {
+        doResetAll({ confirmKind: 'startTracking' });
+      });
       const go = el.querySelector('#banner-settings');
       if (go) go.addEventListener('click', () => {
         activeTab = 'settings';
@@ -710,20 +715,27 @@
 
   async function doResetAll(opts) {
     const skipConfirm = !!(opts && opts.skipConfirm);
+    const resumeWelcome = !!(opts && opts.resumeWelcome);
+    const startTracking = !!(opts && opts.confirmKind === 'startTracking');
     const connected = Sync.state().enabled;
-    const msg = connected
-      ? 'Erase this browser and overwrite your Google Drive Daycells file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.'
-      : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
+    let msg;
+    if (startTracking) {
+      msg = connected
+        ? 'Clear demo data and start with your own habits? This empties this browser and your Google Drive Daycells file.'
+        : 'Clear demo data and start with your own habits?';
+    } else if (connected) {
+      msg = 'Erase this browser and overwrite your Google Drive Daycells file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.';
+    } else {
+      msg = 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
+    }
     if (!skipConfirm && !confirm(msg)) return false;
     Store.resetAll();
     clearSampleActive();
     lsSet('dc_sample_cleared', '1');
-    welcomeOpen = false;
     if (connected) {
       try { await Sync.overwriteRemoteBlank(); }
       catch (e) { alert('Local data cleared, but Drive overwrite failed: ' + (e.message || e)); }
     }
-    presetsOpen = true;
     notesOpen = false;
     activeTab = 'habits';
     detailId = null;
@@ -731,35 +743,20 @@
     calOpen = false;
     mapPage = 0;
     viewDate = null;
+    sampleRemindOpen = false;
+    sampleWarnOpen = false;
+    sampleWarnPending = null;
+    if (resumeWelcome) {
+      lsDel('dc_welcome_seen');
+      lsDel('dc_presets_seen');
+      welcomeOpen = true;
+      presetsOpen = false;
+    } else {
+      welcomeOpen = false;
+      presetsOpen = true;
+    }
     render();
     return true;
-  }
-
-  function loadSampleFromSettings() {
-    const hasData = Store.activeHabits().length > 0 || Object.keys((Store.get().cells) || {}).length > 0;
-    const connected = Sync.state().enabled;
-    let msg = hasData
-      ? 'Replace the data in this browser with sample habits? Export a backup first if you care about what is here.'
-      : 'Load sample habits into this browser?';
-    if (connected) msg += ' You are signed in; the next sync can push this sample to your Drive file.';
-    if (!confirm(msg)) return;
-    try {
-      Store.importJSON(JSON.stringify(Sample.demoDoc()));
-    } catch (e) {
-      alert(e.message || 'Could not load sample data');
-      return;
-    }
-    welcomeOpen = false;
-    presetsOpen = false;
-    notesOpen = false;
-    activeTab = 'habits';
-    detailId = null;
-    editDraft = null;
-    calOpen = false;
-    mapPage = 0;
-    viewDate = null;
-    markSampleActive();
-    render();
   }
 
   // ---------- Today ----------
@@ -1189,8 +1186,8 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">If sample data is loaded, use Settings → <b>Reset all</b> before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
-        '<p class="mini">First visit can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner (or Settings → <b>Reset all</b>) before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
+        '<p class="mini">First visit can load sample habits (~6 months of demo history). To try sample again later, Settings → <b>Reset all</b> brings back the welcome sheet. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -1302,9 +1299,8 @@
         '<button class="btn" id="exportjson">Export JSON</button>' +
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
-        '<button class="btn ghost" id="loadsample">Load sample</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~6 months of demo habits. If you tried sample data, <b>Reset all</b> before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If you tried sample data, use the banner <b>Start tracking</b> (or <b>Reset all</b> here) before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then offers the welcome sheet again (Try sample or Skip).</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -1367,8 +1363,7 @@
       download('daycells-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
-    $('#loadsample').addEventListener('click', () => { loadSampleFromSettings(); });
-    $('#reset').addEventListener('click', () => { doResetAll(); });
+    $('#reset').addEventListener('click', () => { doResetAll({ resumeWelcome: true }); });
   }
 
   // ---------- detail + editor + sample prompts + calendar modals ----------
@@ -1597,7 +1592,7 @@
         '<button type="button" class="btn" id="welcome-sample">Try sample</button>' +
         '<button type="button" class="btn ghost" id="welcome-skip">Skip</button>' +
       '</div>' +
-      '<p class="mini">Explore the demo, then Settings → Reset all before adding your own habits.</p>' +
+      '<p class="mini">Explore the demo, then tap <b>Start tracking</b> on the banner when you are ready for your own habits.</p>' +
     '</div></div>';
   }
 
@@ -1611,6 +1606,7 @@
   function wireWelcome() {
     $('#welcome-skip').addEventListener('click', () => {
       markWelcomeSeen();
+      lsSet('dc_sample_cleared', '1');
       welcomeOpen = false;
       presetsOpen = true;
       render();
