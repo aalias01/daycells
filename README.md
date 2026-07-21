@@ -27,7 +27,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Tap the check on a card to log today. Tap the date for a calendar jump, or use the arrows for nearby days.
 - Tap a card for the 52-week map and stats. Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
-- Theme: Settings → Appearance (auto / light / dark).
+- Theme: Settings → Appearance (auto / light / dark), accent pack, streak grids Accent or By habit.
 - Phone: Share → Add to Home Screen.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
 

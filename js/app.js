@@ -47,9 +47,19 @@
 
   // ---------- color helpers ----------
   function hexToRgba(hex, a) {
-    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#3d9970');
-    const r = m ? parseInt(m[1], 16) : 61, g = m ? parseInt(m[2], 16) : 153, b = m ? parseInt(m[3], 16) : 112;
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '#2f6fed');
+    const r = m ? parseInt(m[1], 16) : 47, g = m ? parseInt(m[2], 16) : 111, b = m ? parseInt(m[3], 16) : 237;
     return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+
+  function accentHex() {
+    return (getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2f6fed');
+  }
+
+  /** Fill color for streak cells / checks: theme accent or per-habit color. */
+  function gridInk(h) {
+    const mode = ((state.settings || {}).gridColor) || 'accent';
+    return mode === 'habit' ? (h.color || accentHex()) : accentHex();
   }
 
   function scheduleLabel(h) {
@@ -64,33 +74,37 @@
 
   // ---------- streakmap builders ----------
   function miniMap(h, weeks) {
+    const ink = gridInk(h);
     const cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, Logic.todayISO());
     return '<div class="gridmini">' + cols.map(col =>
       '<div class="col">' + col.map(c => {
         let style = '';
-        if (c.done) style = 'background:' + esc(h.color);
-        else if (c.skip && !c.future) style = 'background:' + hexToRgba(h.color, .18);
+        if (c.done) style = 'background:' + esc(ink);
+        else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
         return '<span class="c' + (c.future ? ' future' : '') + '" style="' + style + '"></span>';
       }).join('') + '</div>').join('') + '</div>';
   }
 
   function fullMap(h, weeks, endISO) {
+    const ink = gridInk(h);
     const cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, endISO || Logic.todayISO());
     const today = Logic.todayISO();
     return '<div class="gridfull">' + cols.map(col =>
       '<div class="col">' + col.map(c => {
         let style = '';
         const future = c.iso > today;
-        if (c.done) style = 'background:' + esc(h.color);
-        else if (c.skip && !future) style = 'background:' + hexToRgba(h.color, .18);
+        if (c.done) style = 'background:' + esc(ink);
+        else if (c.skip && !future) style = 'background:' + hexToRgba(ink, .18);
         return '<span class="c' + (future ? ' future' : '') + (c.iso === today ? ' today' : '') + '" data-cell="' + c.iso + '" style="' + style + '"></span>';
       }).join('') + '</div>').join('') + '</div>';
   }
 
   function applyTheme() {
-    const t = (state.settings || {}).theme || 'auto';
+    const s = state.settings || {};
+    const t = s.theme || 'auto';
     if (t === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.setAttribute('data-accent', s.accent || 'cobalt');
   }
 
   // ---------- render root ----------
@@ -150,17 +164,18 @@
       const done = Logic.isDone(state.cells, iso, h.id);
       const req = Logic.isRequired(h, iso, state.skips);
       const streak = Logic.currentStreak(h, state.cells, state.skips, today);
+      const ink = gridInk(h);
       const perWeekNote = Logic.isPerWeek(h)
         ? ' · ' + Logic.weekDoneCount(h, state.cells, Logic.weekStartOf(iso), iso) + '/' + Logic.weekTarget(h) + ' this wk' : '';
       return '<div class="hcard" data-open="' + h.id + '" role="button" aria-label="' + esc(h.name) + ' details">' +
         '<div class="top">' +
           '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
           '<span class="nm"><div class="name">' + esc(h.name) + '</div>' +
-            '<div class="meta">' + esc(scheduleLabel(h)) + perWeekNote + ' · ' + streak + Logic.streakUnit(h) + ' 🔥</div></span>' +
+            '<div class="meta">' + esc(scheduleLabel(h)) + perWeekNote + ' · ' + streak + Logic.streakUnit(h) + '</div></span>' +
           '<button class="check' + (done ? ' done' : '') + (!req && !done ? ' optional' : '') + '" data-toggle="' + h.id + '"' +
             ' aria-label="' + esc(h.name) + (done ? ': done, tap to undo' : ': mark done') + '" aria-pressed="' + done + '"' +
-            ' data-color="' + esc(h.color) + '"' +
-            ' style="' + (done ? 'background:' + esc(h.color) + ';border-color:' + esc(h.color) : '') + '">✓</button>' +
+            ' data-color="' + esc(ink) + '"' +
+            ' style="' + (done ? 'background:' + esc(ink) + ';border-color:' + esc(ink) : '') + '">✓</button>' +
         '</div>' + miniMap(h, 18) + '</div>';
     }).join('');
 
@@ -236,7 +251,7 @@
     const avgRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
 
     /* combined heatmap: dayScore levels in accent */
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3d9970';
+    const accent = accentHex();
     const cols = Logic.streakmapWeeks({ id: '__none__', schedule: { kind: 'daily' } }, {}, state.skips, 26, today);
     const hm = '<div class="gridfull">' + cols.map(col => '<div class="col">' + col.map(c => {
       if (c.future) return '<span class="c future"></span>';
@@ -254,7 +269,7 @@
     habits.forEach(h => Logic.dowBreakdown(h, state.cells).forEach((n, i) => dowTotals[i] += n));
     const dowMax = Math.max.apply(null, dowTotals.concat([1]));
     const dowBars = '<div class="bars">' + dowTotals.map((n, i) =>
-      '<div class="b"><b>' + n + '</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + hexToRgba('#3d9970', .8) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>';
+      '<div class="b"><b>' + n + '</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + hexToRgba(accent, .85) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>';
 
     const rows = habits.map(h => {
       const st = Logic.strength(h, state.cells, state.skips, today);
@@ -266,6 +281,14 @@
         '<span class="m">' + f(r7) + '</span><span class="m">' + f(r30) + '</span></div>';
     }).join('');
 
+    const heatLegend =
+      '<span class="heatswatch" style="background:var(--cell0)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat1)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat2)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat3)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat4)"></span>' +
+      ' idle → full day';
+
     $('#view').innerHTML =
       '<div class="card"><h2>Overview</h2><div class="statgrid">' +
         '<div class="stat"><div class="v">' + doneToday + '/' + reqToday + '</div><div class="k">today</div></div>' +
@@ -274,7 +297,7 @@
         '<div class="stat"><div class="v">' + habits.length + '</div><div class="k">active habits</div></div>' +
       '</div></div>' +
       '<div class="card"><h2>All habits · 26 weeks</h2>' + hm +
-        '<div class="maplegend">Cell shade = share of scheduled habits completed that day. Tap a habit on Today for its own streakmap.</div></div>' +
+        '<div class="maplegend">' + heatLegend + '<br>Cell shade = share of scheduled habits completed that day. Tap a habit on Today for its own streakmap.</div></div>' +
       '<div class="card"><h2>Completions by weekday</h2>' + dowBars + '</div>' +
       '<div class="card"><h2>Per habit · strength / 7d / 30d</h2>' + rows +
         '<div class="mini">Strength is an exponentially weighted average (Loop Habit Tracker model): a miss dents it, it never zeroes like a streak. Rest days never penalize.</div></div>';
@@ -335,7 +358,8 @@
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
-          '<li>Settings → <b>Appearance</b>: auto, light, or dark.</li>' +
+          '<li>Settings → <b>Appearance</b>: light/dark mode, accent (Cobalt / Ink / Teal / Fern), and whether streak grids use the accent or each habit\'s color.</li>' +
+          '<li>Edit a habit to change its color (used when grids are <b>By habit</b>, and on emoji tiles / strength bars).</li>' +
           '<li>On iPhone/Android: browser Share → <b>Add to Home Screen</b> for an app-like icon.</li>' +
         '</ul>' +
       '</div>' +
@@ -426,10 +450,29 @@
       '</div>' +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
-        '<div class="set-row"><span class="grow">Theme</span><span class="seg" id="themeseg">' +
+        '<div class="set-row"><span class="grow">Mode</span><span class="seg" id="themeseg">' +
         ['auto', 'light', 'dark'].map(t =>
           '<button data-theme-opt="' + t + '" class="' + (((state.settings || {}).theme || 'auto') === t ? 'on' : '') + '">' + t + '</button>').join('') +
         '</span></div>' +
+        '<div class="set-row"><span class="grow">Accent</span><span class="seg accentseg" id="accentseg">' +
+        [
+          { id: 'cobalt', label: 'Cobalt', sw: '#2f6fed' },
+          { id: 'ink', label: 'Ink', sw: '#2a3344' },
+          { id: 'teal', label: 'Teal', sw: '#1f8a8a' },
+          { id: 'fern', label: 'Fern', sw: '#3d9970' }
+        ].map(a =>
+          '<button data-accent-opt="' + a.id + '" class="' + (((state.settings || {}).accent || 'cobalt') === a.id ? 'on' : '') + '">' +
+            '<span class="swatch" style="background:' + a.sw + '"></span>' + a.label +
+          '</button>').join('') +
+        '</span></div>' +
+        '<div class="set-row"><span class="grow">Streak grids</span><span class="seg" id="gridseg">' +
+        [
+          { id: 'accent', label: 'Accent' },
+          { id: 'habit', label: 'By habit' }
+        ].map(g =>
+          '<button data-grid-opt="' + g.id + '" class="' + (((state.settings || {}).gridColor || 'accent') === g.id ? 'on' : '') + '">' + g.label + '</button>').join('') +
+        '</span></div>' +
+        '<div class="mini">Accent paints chrome and unified grids. <b>By habit</b> uses each habit\'s color (edit a habit to change it). Analytics overview always uses Accent.</div>' +
       '</div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
         '<button class="btn" id="exportjson">Export JSON</button>' +
@@ -467,6 +510,12 @@
     });
     document.querySelectorAll('[data-theme-opt]').forEach(b => b.addEventListener('click', () => {
       Store.setSetting('theme', b.dataset.themeOpt); render();
+    }));
+    document.querySelectorAll('[data-accent-opt]').forEach(b => b.addEventListener('click', () => {
+      Store.setSetting('accent', b.dataset.accentOpt); render();
+    }));
+    document.querySelectorAll('[data-grid-opt]').forEach(b => b.addEventListener('click', () => {
+      Store.setSetting('gridColor', b.dataset.gridOpt); render();
     }));
     document.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', () => { Store.moveHabit(b.dataset.id, +b.dataset.mv); render(); }));
     document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
