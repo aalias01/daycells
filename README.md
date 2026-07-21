@@ -24,15 +24,15 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- **Today:** tap the check to log a day. Tap the left side of a habit (icon/name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
+- **Habits:** tap the check to log a day. Tap the left side of a habit (icon/name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
 - **Rest day** makes every habit optional that day without breaking streaks.
-- **Notes:** optional note under Today for that day. **See all notes** lists older notes and jumps to that day.
+- **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
 - **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
 - **Analytics → Focus one:** dig into a single habit.
 - Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
 - **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.
 - **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
-- **Milestone chips:** **3d+** / **7d+** (or **2w+** / **4w+** for weekly habits) on Today and Analytics when you hit them.
+- **Milestone chips:** **3d+** / **7d+** (or **2w+** / **4w+** for weekly habits) on Habits and Analytics when you hit them.
 - Theme: Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.

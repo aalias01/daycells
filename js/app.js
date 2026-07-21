@@ -38,9 +38,9 @@
   ];
 
   let state = null;
-  let activeTab = 'today';
+  let activeTab = 'habits';
   let syncStatus = { s: 'off', detail: '' };
-  let detailId = null;   // open habit detail (legacy sheet; Today no longer opens it)
+  let detailId = null;   // open habit detail (legacy sheet; Habits no longer opens it)
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let welcomeOpen = false;
@@ -50,7 +50,7 @@
   let analyticsMode = 'all';       // 'all' | 'focus'
   let analyticsFocusHabitId = null;
   let analyticsYear = null;        // null = current calendar year
-  let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
+  let viewDate = null;   // Habits tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
   let calMonth = null;   // 'YYYY-MM' while calendar is open
   let clientIdAdvanced = false;
@@ -255,7 +255,7 @@
       if (c.done) style = 'background:' + esc(ink);
       else if ((c.skip || c.off) && !c.future) style = 'background:' + hexToRgba(ink, .36);
     }
-    const openable = !!opts.openInToday && !c.future && !c.outside;
+    const openable = !!opts.openInHabits && !c.future && !c.outside;
     let tip = '';
     if (!c.future && !c.outside) {
       const nice = Logic.parseDate(c.iso).toLocaleDateString(undefined, {
@@ -272,7 +272,7 @@
       else status = 'Not done';
       const note = (Store.getNote(c.iso) || '').trim();
       const noteBit = note ? (note.length > 80 ? note.slice(0, 77) + '…' : note) : '';
-      tip = nice + ' · ' + status + (noteBit ? ' · ' + noteBit : '') + (openable ? ' · Open in Today' : '');
+      tip = nice + ' · ' + status + (noteBit ? ' · ' + noteBit : '') + (openable ? ' · Open in Habits' : '');
     }
     return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + (openable ? ' jump' : '') + '"' +
       (openable ? ' data-jump-day="' + c.iso + '" role="button" tabindex="0"' : '') +
@@ -447,11 +447,11 @@
     if (activeTab === 'settings' && shouldShowSigninBanner()) {
       signinBtnNudge = true;
     }
-    if (activeTab === 'today') renderToday();
+    if (activeTab === 'habits') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
     else if (activeTab === 'help') renderHelp();
     else renderSettings();
-    $('#fab').classList.toggle('hidden', activeTab !== 'today');
+    $('#fab').classList.toggle('hidden', activeTab !== 'habits');
     renderModal();
     renderInfoBanner();
     window.scrollTo(0, y);
@@ -566,7 +566,7 @@
     }
     presetsOpen = true;
     notesOpen = false;
-    activeTab = 'today';
+    activeTab = 'habits';
     detailId = null;
     editDraft = null;
     calOpen = false;
@@ -593,7 +593,7 @@
     welcomeOpen = false;
     presetsOpen = false;
     notesOpen = false;
-    activeTab = 'today';
+    activeTab = 'habits';
     detailId = null;
     editDraft = null;
     calOpen = false;
@@ -809,7 +809,7 @@
         const iso = c.dataset.jumpDay;
         const today = Logic.todayISO();
         if (!iso || iso > today) return;
-        activeTab = 'today';
+        activeTab = 'habits';
         viewDate = iso >= today ? null : iso;
         hideHeatTip();
         render();
@@ -897,14 +897,14 @@
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInToday: true });
+      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: true });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to open in Today';
+      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to open in Habits';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInToday: true });
+      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: true });
       heatTitle = 'All habits · ' + year;
-      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day to open in Today';
+      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day to open in Habits';
     }
 
     const overview = analyticsMode === 'focus'
@@ -977,9 +977,9 @@
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
-          '<li><b>Today</b>: tap the <b>checkmark</b> to log it. Tap the left side of a habit (icon/name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
+          '<li><b>Habits</b>: tap the <b>checkmark</b> to log it. Tap the left side of a habit (icon/name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
-          '<li>Optional <b>note</b> under Today for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
+          '<li>Optional <b>note</b> under Habits for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
         '</ul>' +
       '</div>' +
       '<div class="card help"><h2>Analytics</h2>' +
@@ -989,7 +989,7 @@
         '</ul>' +
         '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
         '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
-        '<p class="mini"><b>Milestone chips:</b> <b>3d+</b> / <b>7d+</b> (or <b>2w+</b> / <b>4w+</b> for weekly habits) on Today and Analytics when you hit them.</p>' +
+        '<p class="mini"><b>Milestone chips:</b> <b>3d+</b> / <b>7d+</b> (or <b>2w+</b> / <b>4w+</b> for weekly habits) on Habits and Analytics when you hit them.</p>' +
       '</div>' +
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
@@ -1300,7 +1300,7 @@
       markWelcomeSeen();
       welcomeOpen = false;
       presetsOpen = false;
-      activeTab = 'today';
+      activeTab = 'habits';
       showSampleBanner();
       render();
     });
@@ -1376,7 +1376,7 @@
       const iso = b.dataset.noteDay;
       const today = Logic.todayISO();
       notesOpen = false;
-      activeTab = 'today';
+      activeTab = 'habits';
       viewDate = iso >= today ? null : iso;
       render();
     }));
@@ -1629,8 +1629,8 @@
     deferredInstall = null;
     render();
   });
-  /* midnight rollover: refresh the Today view when the date changes */
+  /* midnight rollover: refresh the Habits view when the date changes */
   setInterval(() => {
-    if (activeTab === 'today' && !viewDate && $('#view').dataset.viewIso !== Logic.todayISO()) render();
+    if (activeTab === 'habits' && !viewDate && $('#view').dataset.viewIso !== Logic.todayISO()) render();
   }, 60000);
 })();
