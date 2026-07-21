@@ -28,7 +28,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- **Habits:** tap the check to log a day. Tap the left side of a habit (icon/name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
+- **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
 - **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
@@ -37,7 +37,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
 - **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.
 - **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
-- **Milestone chips:** **3d+** / **7d+** (or **2w+** / **4w+** for weekly habits) on Habits and Analytics when you hit them.
+- **Milestone chips:** **3d+** / **7d+** / **21d+** (or **2w+** / **4w+** for weekly habits) on Habits and Analytics when you hit them.
 - Theme: defaults to light. Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).

@@ -215,7 +215,7 @@
   }
 
   const STREAK_CELEB_KEY = 'dc_streak_celebrate';
-  const STREAK_TIER_RANK = { none: 0, mild: 1, hot: 2 };
+  const STREAK_TIER_RANK = { none: 0, mild: 1, hot: 2, blaze: 3 };
   let streakCelebrated = {};
   try { streakCelebrated = JSON.parse(localStorage.getItem(STREAK_CELEB_KEY) || '{}'); } catch (e) { streakCelebrated = {}; }
 
@@ -225,6 +225,7 @@
       if (streak >= 2) return 'mild';
       return 'none';
     }
+    if (streak >= 21) return 'blaze';
     if (streak >= 7) return 'hot';
     if (streak >= 3) return 'mild';
     return 'none';
@@ -235,7 +236,7 @@
     if (tier === 'none') return '';
     const label = Logic.isPerWeek(h)
       ? (tier === 'hot' ? '4w+' : '2w+')
-      : (tier === 'hot' ? '7d+' : '3d+');
+      : (tier === 'blaze' ? '21d+' : tier === 'hot' ? '7d+' : '3d+');
     return '<span class="streakchip ' + tier + '" data-streak-chip="' + esc(habitId || h.id) + '">' + label + '</span>';
   }
 
@@ -404,7 +405,12 @@
         el.classList.add('celebrate', 'celebrate-' + u.tier);
         setTimeout(() => el.classList.remove('celebrate', 'celebrate-' + u.tier), 600);
       }
-      if (navigator.vibrate) { try { navigator.vibrate(u.tier === 'hot' ? [10, 30, 10] : 12); } catch (e) {} }
+      if (navigator.vibrate) {
+        try {
+          const pattern = u.tier === 'blaze' ? [12, 28, 12, 28, 12] : u.tier === 'hot' ? [10, 30, 10] : 12;
+          navigator.vibrate(pattern);
+        } catch (e) {}
+      }
     });
   }
 
@@ -1029,7 +1035,7 @@
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
-          '<li><b>Habits</b>: tap the <b>checkmark</b> to log it. Tap the left side of a habit (icon/name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
+          '<li><b>Habits</b>: tap the <b>checkmark</b> to log it. Tap the habit row (icon or name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional <b>note</b> under Habits for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
         '</ul>' +
@@ -1041,7 +1047,7 @@
         '</ul>' +
         '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
         '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
-        '<p class="mini"><b>Milestone chips:</b> <b>3d+</b> / <b>7d+</b> (or <b>2w+</b> / <b>4w+</b> for weekly habits) on Habits and Analytics when you hit them.</p>' +
+        '<p class="mini"><b>Milestone chips:</b> <b>3d+</b> / <b>7d+</b> / <b>21d+</b> (or <b>2w+</b> / <b>4w+</b> for weekly habits) on Habits and Analytics when you hit them.</p>' +
       '</div>' +
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
@@ -1050,7 +1056,7 @@
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
           '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears. On iPhone/iPad (Safari): Share → <b>Add to Home Screen</b> → Add. <b>Share link</b> opens the system share sheet (or copies the URL) so you can send Daycells to someone else.</li>' +
         '</ul>' +
-        '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
+        '<p class="mini">Habits save automatically on this phone or laptop. Google Sign-in is optional and only for syncing the same data to another device. Clearing this site’s browser data (or uninstalling the app) deletes the local copy unless you signed in or exported a backup.</p>' +
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +

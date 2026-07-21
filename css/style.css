@@ -600,6 +600,7 @@ button.calcell:active { transform: scale(.96); }
 }
 .streakchip.mild { background: rgba(201, 146, 42, .18); color: #a67318; }
 .streakchip.hot { background: var(--accent-soft); color: var(--accent-ink); }
+.streakchip.blaze { background: rgba(196, 74, 42, .22); color: #b33a1f; }
 .streakchip.celebrate { animation: streakpop .45s ease; }
 @keyframes streakpop {
   0% { transform: scale(1); }
