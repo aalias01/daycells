@@ -573,7 +573,7 @@
   Sync.resume();
   /* offline + installability; no-op on file:// */
   if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
   /* midnight rollover: refresh the Today view when the date changes */
   setInterval(() => {
