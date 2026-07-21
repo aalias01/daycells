@@ -314,18 +314,17 @@ nav.tabs button.active::before {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
+  align-content: start;
 }
-.calgrid { grid-auto-rows: auto; }
 .caldows { margin-bottom: 8px; }
 .caldows span {
   text-align: center; font-size: 11px; font-weight: 600; color: var(--muted);
   letter-spacing: .02em; padding: 2px 0; font-family: var(--font-mono);
 }
 .calcell {
-  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
   width: 100%;
-  height: auto;
-  min-height: 0;
+  aspect-ratio: 1;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--card);
@@ -333,20 +332,16 @@ nav.tabs button.active::before {
   font-size: 14px;
   font-weight: 550;
   font-variant-numeric: tabular-nums;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  margin: 0;
   font-family: var(--font-mono);
+  line-height: 1;
 }
 button.calcell { cursor: pointer; }
 button.calcell:active { transform: scale(.96); }
-/* Keep box size identical to day cells; empty leading days must not inflate row height */
-.calcell.empty {
-  visibility: hidden;
-  pointer-events: none;
-  border-color: transparent;
-  background: transparent;
-}
 .calcell.future {
   color: var(--muted);
   opacity: .45;

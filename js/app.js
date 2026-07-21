@@ -677,16 +677,17 @@
     const canNext = ym < thisYm;
 
     let cells = '';
-    for (let i = 0; i < startDow; i++) cells += '<span class="calcell empty" aria-hidden="true">&nbsp;</span>';
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = ym + '-' + (d < 10 ? '0' : '') + d;
       const future = iso > today;
       const isSel = iso === selected;
       const isTod = iso === today;
       const cls = 'calcell' + (future ? ' future' : '') + (isSel ? ' selected' : '') + (isTod ? ' today' : '');
+      /* Skip empty placeholder cells (they inflated the first row). Offset day 1 instead. */
+      const col = (d === 1 && startDow > 0) ? ' style="grid-column-start:' + (startDow + 1) + '"' : '';
       cells += future
-        ? '<span class="' + cls + '">' + d + '</span>'
-        : '<button type="button" class="' + cls + '" data-calday="' + iso + '">' + d + '</button>';
+        ? '<span class="' + cls + '"' + col + '>' + d + '</span>'
+        : '<button type="button" class="' + cls + '" data-calday="' + iso + '"' + col + '>' + d + '</button>';
     }
 
     return '<div class="overlay" id="ovl"><div class="sheet calsheet"><div class="grab"></div>' +
