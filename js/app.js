@@ -591,7 +591,7 @@
       tab: 'habits',
       target: '#tour-habits',
       title: 'Demo habits',
-      body: 'This is sample history (~6 months). Tap a check to try logging. Nothing here is your real streak yet.'
+      body: 'This is sample history (~6 months). Tap a check to log. Tap the name or icon to edit (sheet on top; you stay here). Nothing here is your real streak yet.'
     },
     {
       tab: 'settings',
@@ -606,6 +606,11 @@
       body: 'All shows your portfolio across habits. Focus one digs into a single habit. Overview and the year heatmap sit below.'
     }
   ];
+
+  /** Sheets that sit under the tour z-index — hide tour until closed so Next cannot advance underneath. */
+  function demoTourPausedBySheet() {
+    return !!(editDraft || presetsOpen || notesOpen || calOpen || detailId || sampleWarnOpen || sampleRemindOpen);
+  }
 
   function endDemoTour() {
     demoTourStep = 0;
@@ -632,13 +637,18 @@
   }
 
   function positionDemoTour() {
-    if (!demoTourStep || demoTourStep > DEMO_TOUR.length) {
+    if (!demoTourStep || demoTourStep > DEMO_TOUR.length || demoTourPausedBySheet()) {
       const dead = document.getElementById('demo-tour');
       if (dead) dead.remove();
       return;
     }
     const step = DEMO_TOUR[demoTourStep - 1];
     const place = () => {
+      if (!demoTourStep || demoTourStep > DEMO_TOUR.length || demoTourPausedBySheet()) {
+        const dead = document.getElementById('demo-tour');
+        if (dead) dead.remove();
+        return;
+      }
       const target = document.querySelector(step.target);
       let el = document.getElementById('demo-tour');
       if (!el) {
@@ -674,9 +684,14 @@
           '</div>' +
         '</div>';
       const back = el.querySelector('#tour-back');
-      if (back) back.addEventListener('click', () => { demoTourStep = Math.max(1, demoTourStep - 1); render(); });
+      if (back) back.addEventListener('click', () => {
+        if (demoTourPausedBySheet()) return;
+        demoTourStep = Math.max(1, demoTourStep - 1);
+        render();
+      });
       el.querySelector('#tour-skip').addEventListener('click', () => { endDemoTour(); render(); });
       el.querySelector('#tour-next').addEventListener('click', () => {
+        if (demoTourPausedBySheet()) return;
         if (isLast) endDemoTour();
         else demoTourStep += 1;
         render();
