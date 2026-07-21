@@ -101,6 +101,7 @@
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
     if (activeTab === 'today') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
+    else if (activeTab === 'help') renderHelp();
     else renderSettings();
     $('#fab').classList.toggle('hidden', activeTab !== 'today');
     renderModal();
@@ -254,6 +255,62 @@
         '<div class="mini">Strength is an exponentially weighted average (Loop Habit Tracker model): a miss dents it, it never zeroes like a streak. Rest days never penalize.</div></div>';
   }
 
+  // ---------- Help ----------
+  function renderHelp() {
+    const origin = location.origin;
+    $('#view').innerHTML =
+      '<div class="card help"><h2>What this app is</h2>' +
+        '<p>StreakGrid tracks habits with a contribution grid. It runs entirely in your browser. Optional sync writes one JSON file to <em>your</em> Google Drive. There is no StreakGrid account.</p>' +
+      '</div>' +
+      '<div class="card help"><h2>Saving data</h2>' +
+        '<ul>' +
+          '<li><b>Browser:</b> every check-in is saved on this device automatically.</li>' +
+          '<li><b>Export:</b> Settings → Export JSON (full backup) or Export CSV.</li>' +
+          '<li><b>Drive sync:</b> phone + laptop, and recovery if you clear site data. Needs your own OAuth Client ID (below).</li>' +
+        '</ul>' +
+      '</div>' +
+      '<div class="card help"><h2>Set up Google Drive sync</h2>' +
+        '<p>About five minutes. Free for normal personal use. You need a Google account.</p>' +
+        '<p class="originbox">Add this exact origin in Google Cloud (step 4):<br><code id="helporigin">' + esc(origin) + '</code>' +
+        ' <button type="button" class="btn ghost" id="copyorigin">Copy</button></p>' +
+        '<ol class="helpol">' +
+          '<li>Open <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a> and create a project (any name).</li>' +
+          '<li><b>APIs &amp; Services → Library</b> → enable <b>Google Drive API</b>.</li>' +
+          '<li><b>Google Auth Platform</b> (search “oauth” if you do not see it):' +
+            '<ul>' +
+              '<li><b>Branding:</b> app name (e.g. StreakGrid) and your email. Save.</li>' +
+              '<li><b>Audience:</b> External. Stay in <b>Testing</b>. Add your Gmail under Test users. Save.</li>' +
+              '<li><b>Data Access → Add or remove scopes:</b> check <code>userinfo.email</code>. Manually add <code>https://www.googleapis.com/auth/drive.file</code>, then Update.</li>' +
+            '</ul>' +
+          '</li>' +
+          '<li><b>Clients → Create client → Web application.</b> Under Authorized JavaScript origins, add the origin shown above. Leave redirect URIs empty. Create. Copy the <b>Client ID</b> only. Ignore the Client Secret.</li>' +
+          '<li>Back here: <b>Settings</b> → paste the Client ID → <b>Sign in with Google</b>.</li>' +
+        '</ol>' +
+        '<p class="mini">After sign-in, Drive should show a folder named <code>StreakGrid</code> with <code>streakgrid-data.json</code>. On a second device, paste the same Client ID once, sign in with the same Google account.</p>' +
+      '</div>' +
+      '<div class="card help"><h2>If something fails</h2>' +
+        '<ul>' +
+          '<li><b>Popup fails / origin error:</b> the origin above is missing from your OAuth client.</li>' +
+          '<li><b>Access blocked:</b> your Gmail is not in Audience → Test users (or publish the OAuth app).</li>' +
+          '<li><b>No Client ID configured:</b> paste it in Settings and wait a moment, then Sign in again.</li>' +
+          '<li><b>Data missing after clearing the browser:</b> Sign in again to pull Drive, or import a JSON export.</li>' +
+        '</ul>' +
+        '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings</button></div>' +
+      '</div>';
+
+    $('#copyorigin').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(origin);
+        const b = $('#copyorigin');
+        b.textContent = 'Copied';
+        setTimeout(() => { b.textContent = 'Copy'; }, 1500);
+      } catch (e) {
+        prompt('Copy this origin:', origin);
+      }
+    });
+    $('#helptosettings').addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
+  }
+
   // ---------- Settings ----------
   function renderSettings() {
     const st = Sync.state();
@@ -264,7 +321,7 @@
         '<div class="mini">Your data lives in a "StreakGrid" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).</div>'
       : '<div class="set-row"><span class="grow">Store your data in your own Google Drive and sync across devices.</span>' +
         '<button class="btn" id="connect">Sign in with Google</button></div>' +
-        (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Local-only mode keeps working without sign-in.</div>');
+        (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Tracking without sign-in still works.</div>');
 
     const habitRows = Store.activeHabits().map(h =>
       '<div class="set-row"><span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
@@ -282,7 +339,8 @@
       '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
         '<div class="set-row"><span class="grow">OAuth Client ID</span>' +
         '<input type="text" id="clientid" placeholder="xxxx.apps.googleusercontent.com" value="' + esc(localStorage.getItem('sg_gclient') || '') + '"></div>' +
-        '<div class="mini">Only needed if this deployment has no built-in client ID (see README → Enable Google Drive sync).</div>' +
+        '<div class="mini">Your own Client ID from Google Cloud. Paste it here (stays in this browser). Do not paste the Client Secret.</div>' +
+        '<div class="mini"><button type="button" class="linkish" id="gotohelp">How to create a Client ID (Help) →</button></div>' +
       '</div>' +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
@@ -296,15 +354,17 @@
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">Local-first: this browser holds the working copy. Nothing is ever pruned, so every day you have logged stays available to future analytics. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) ready for pandas or a spreadsheet.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet.</div>' +
       '</div>' +
-      '<div class="card"><h2>About</h2><div class="mini">StreakGrid: a free, open, bring-your-own-cloud habit tracker. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks.</div></div>';
+      '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. See Help for Drive setup. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
 
     const cn = $('#connect');
     if (cn) cn.addEventListener('click', async () => {
       try { await Sync.connect(); } catch (e) { alert(e.message); }
       render();
     });
+    const gh = $('#gotohelp');
+    if (gh) gh.addEventListener('click', () => { activeTab = 'help'; render(); window.scrollTo(0, 0); });
     const dc = $('#disconnect');
     if (dc) dc.addEventListener('click', () => { Sync.disconnect(); render(); });
     const sn = $('#syncnow');
