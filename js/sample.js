@@ -159,7 +159,7 @@ const Sample = (() => {
       cells: cells,
       skips: skips,
       notes: notes,
-      settings: { weekStart: 1, theme: 'auto', accent: 'cobalt' },
+      settings: { weekStart: 1, theme: 'light', accent: 'cobalt' },
       settingsUpdatedAt: t
     };
   }

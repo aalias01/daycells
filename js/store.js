@@ -23,7 +23,7 @@ const Store = (() => {
       cells: {},       // 'iso|habitId' -> {v,ts}
       skips: {},       // iso -> {v,ts}
       notes: {},       // iso -> {text,ts}
-      settings: { weekStart: 1 },
+      settings: { weekStart: 1, theme: 'light', accent: 'cobalt' },
       settingsUpdatedAt: 0
     };
   }

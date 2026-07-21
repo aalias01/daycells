@@ -408,7 +408,7 @@
 
   function applyTheme() {
     const s = state.settings || {};
-    const t = s.theme || 'auto';
+    const t = s.theme || 'light';
     if (t === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', t);
     document.documentElement.setAttribute('data-accent', s.accent || 'cobalt');
@@ -1133,11 +1133,10 @@
         advancedBody +
       '</div>' +
       installCardHTML() +
-      '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
         '<div class="set-row"><span class="grow">Mode</span><span class="seg" id="themeseg">' +
         ['auto', 'light', 'dark'].map(t =>
-          '<button data-theme-opt="' + t + '" class="' + (((state.settings || {}).theme || 'auto') === t ? 'on' : '') + '">' + t + '</button>').join('') +
+          '<button data-theme-opt="' + t + '" class="' + (((state.settings || {}).theme || 'light') === t ? 'on' : '') + '">' + t + '</button>').join('') +
         '</span></div>' +
         '<div class="set-row accentrow"><span class="set-label">Accent</span><span class="seg accentseg" id="accentseg">' +
         [
@@ -1154,6 +1153,7 @@
         '</span></div>' +
         '<div class="mini">Accent paints chrome and the All-habits year heatmap. Focus one uses each habit\'s color (edit a habit to change it).</div>' +
       '</div>' +
+      '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
         '<button class="btn" id="exportjson">Export JSON</button>' +
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
