@@ -27,7 +27,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
 - Theme: Settings → Appearance (auto / light / dark).
 - Phone: Share → Add to Home Screen.
-- In-app **Help**: how to track habits, Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
+- In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
 
 ## Google Drive setup (full reference)
 

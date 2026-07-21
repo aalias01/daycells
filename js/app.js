@@ -320,14 +320,23 @@
     $('#view').innerHTML =
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
-          '<li>Tap <b>+</b> to add a habit (presets or your own).</li>' +
-          '<li>On <b>Today</b>, tap the checkmark to log it.</li>' +
+          '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
+          '<li>On <b>Today</b>, tap the <b>checkmark</b> to log it. The mini grid on the card is recent weeks at a glance.</li>' +
+          '<li>Tap the <b>habit card</b> (name or grid, not the check) for the 52-week map, strength, and stats. Edit or delete from there too.</li>' +
           '<li>Forgot a day? Tap the date for a calendar, or use the arrows. Future days are blocked.</li>' +
-          '<li>Need a break? Tap <b>mark rest day</b> so streaks do not break.</li>' +
+          '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
+          '<li>Optional: add a one-line <b>note</b> under Today for that day.</li>' +
         '</ul>' +
+        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. Strength (0–100) is a rolling score with a ~2-week memory.</p>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       driveCard +
+      '<div class="card help"><h2>Phone and look</h2>' +
+        '<ul>' +
+          '<li>Settings → <b>Appearance</b>: auto, light, or dark.</li>' +
+          '<li>On iPhone/Android: browser Share → <b>Add to Home Screen</b> for an app-like icon.</li>' +
+        '</ul>' +
+      '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
