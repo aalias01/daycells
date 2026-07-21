@@ -1,0 +1,8 @@
+{
+  "name": "streakgrid",
+  "private": true,
+  "description": "StreakGrid habit tracker (static)",
+  "scripts": {
+    "build": "node scripts/inject-client-id.js"
+  }
+}

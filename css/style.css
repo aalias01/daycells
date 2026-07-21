@@ -226,7 +226,10 @@ button.calcell:active { transform: scale(.96); }
 .set-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; flex-wrap: wrap; }
 .set-row:last-child { border-bottom: 0; }
 .set-row .grow { flex: 1; min-width: 120px; }
-.set-row input[type=text] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); font-size: 13px; }
+.set-row input[type=text],
+.set-row input[type=password] { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); font-size: 13px; }
+.set-row.clientidrow { border-bottom: 0; padding-top: 4px; }
+.advbody { margin-top: 8px; padding-top: 4px; border-top: 1px dashed var(--line); }
 .set-row .up, .set-row .down { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; width: 28px; height: 28px; color: var(--ink); }
 
 textarea.note { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); padding: 9px 11px; font: inherit; font-size: 13.5px; resize: vertical; min-height: 40px; }

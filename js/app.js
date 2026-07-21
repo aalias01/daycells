@@ -16,6 +16,8 @@
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
   let calMonth = null;   // 'YYYY-MM' while calendar is open
+  let clientIdAdvanced = false;
+  let clientIdReveal = false;
 
   /* Preset library. Grounded in what people actually track (Loggd 2026 data:
      exercise, water, reading, journaling, meditation, sleep, vitamins lead)
@@ -300,7 +302,7 @@
         '<p>Optional. Keeps habits in your Google Drive so a second device (or a cleared browser) can restore them.</p>' +
         '<div class="btnrow"><button class="btn" id="help-connect">Sign in with Google</button></div>' +
         '<p class="mini">Google will ask for Drive access. Accept. Your habits stay in <em>your</em> Drive only.</p>' +
-        '<p class="mini">If Google says access blocked, your email is not on the app\'s test-user list. Ask whoever shared the Client ID to add your Gmail, then try again.</p>' +
+        '<p class="mini">If Google says access blocked, your Gmail is not on this app\'s test-user list. Ask the person who runs the Google Cloud project to add you, then try again.</p>' +
         '</div>';
     } else if (!GDrive.onHttp()) {
       driveCard =
@@ -310,9 +312,9 @@
     } else {
       driveCard =
         '<div class="card help"><h2>Phone + laptop sync</h2>' +
-        '<p>Optional. First paste a Client ID in Settings (the long <code>….apps.googleusercontent.com</code> string). Someone may have shared theirs with you, or you can create one (link below).</p>' +
-        '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings to paste it</button></div>' +
-        '<p class="mini">After it is pasted, return here and you will get a <b>Sign in with Google</b> button.</p>' +
+        '<p>Optional. This copy of the app has no Client ID yet (common for forks or local serve). Paste one in Settings → Advanced, or create your own (link below).</p>' +
+        '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings</button></div>' +
+        '<p class="mini">After a Client ID is set, return here for <b>Sign in with Google</b>.</p>' +
         '<p class="mini">How to create a Client ID: <a href="https://github.com/aalias01/streakgrid#google-drive-setup-full-reference" target="_blank" rel="noopener">setup guide on GitHub</a>.</p>' +
         '</div>';
     }
@@ -361,6 +363,11 @@
   function renderSettings() {
     const st = Sync.state();
     const reason = GDrive.unavailableReason ? GDrive.unavailableReason() : null;
+    const override = (localStorage.getItem('sg_gclient') || '').trim();
+    const baked = (((window.SG_CONFIG || {}).googleClientId) || '').trim();
+    const configured = GDrive.configured();
+    if (!configured) clientIdAdvanced = true;
+
     const driveBody = st.enabled
       ? '<div class="set-row"><span class="grow">Connected as <b>' + esc(st.email || '?') + '</b></span>' +
         '<button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disconnect">Disconnect</button></div>' +
@@ -368,6 +375,34 @@
       : '<div class="set-row"><span class="grow">Store your data in your own Google Drive and sync across devices.</span>' +
         '<button class="btn" id="connect">Sign in with Google</button></div>' +
         (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Tracking without sign-in still works.</div>');
+
+    let clientBlock;
+    if (configured && !override && baked) {
+      clientBlock =
+        '<div class="mini" style="margin-top:8px">Client ID is set for this app. Sign in above. Only Google accounts on the project\'s test-user list can connect.</div>';
+    } else if (configured && override) {
+      clientBlock =
+        '<div class="mini" style="margin-top:8px">Using a Client ID override saved on this device. Sign in above.</div>';
+    } else {
+      clientBlock =
+        '<div class="mini" style="margin-top:8px">No Client ID yet. Open Advanced to paste one (forks / local), or deploy with <code>GOOGLE_CLIENT_ID</code>.</div>';
+    }
+
+    const inputType = clientIdReveal ? 'text' : 'password';
+    const advancedBody = clientIdAdvanced
+      ? '<div class="advbody">' +
+          '<div class="set-row"><span class="grow">Override Client ID</span></div>' +
+          '<div class="set-row clientidrow">' +
+            '<input type="' + inputType + '" id="clientid" autocomplete="off" spellcheck="false" ' +
+              'placeholder="xxxx.apps.googleusercontent.com" value="' + esc(override) + '">' +
+            '<button type="button" class="btn ghost" id="clientidtoggle">' + (clientIdReveal ? 'Hide' : 'Show') + '</button>' +
+          '</div>' +
+          '<div class="btnrow" style="margin-top:8px">' +
+            (override ? '<button type="button" class="btn ghost" id="clientidclear">Clear override</button>' : '') +
+          '</div>' +
+          '<div class="mini">Override stays on this device only. Leave empty to use the app default when the deploy provides one. Creating a Client ID: see the GitHub README.</div>' +
+        '</div>'
+      : '';
 
     const habitRows = Store.activeHabits().map(h =>
       '<div class="set-row"><span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
@@ -383,9 +418,11 @@
 
     $('#view').innerHTML =
       '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
-        '<div class="set-row"><span class="grow">OAuth Client ID</span>' +
-        '<input type="text" id="clientid" placeholder="xxxx.apps.googleusercontent.com" value="' + esc(localStorage.getItem('sg_gclient') || '') + '"></div>' +
-        '<div class="mini">Paste the Client ID here (stays on this device). Then tap Sign in with Google above.</div>' +
+        clientBlock +
+        '<button type="button" class="linkish" id="clientidadv" style="margin-top:10px">' +
+          (clientIdAdvanced ? 'Hide Advanced' : 'Advanced: override Client ID') +
+        '</button>' +
+        advancedBody +
       '</div>' +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
@@ -412,7 +449,22 @@
     if (dc) dc.addEventListener('click', () => { Sync.disconnect(); render(); });
     const sn = $('#syncnow');
     if (sn) sn.addEventListener('click', () => Sync.fullSync(true));
-    $('#clientid').addEventListener('change', ev => { localStorage.setItem('sg_gclient', ev.target.value.trim()); render(); });
+    $('#clientidadv').addEventListener('click', () => { clientIdAdvanced = !clientIdAdvanced; render(); });
+    const cid = $('#clientid');
+    if (cid) cid.addEventListener('change', ev => {
+      const v = ev.target.value.trim();
+      if (v) localStorage.setItem('sg_gclient', v);
+      else localStorage.removeItem('sg_gclient');
+      render();
+    });
+    const tog = $('#clientidtoggle');
+    if (tog) tog.addEventListener('click', () => { clientIdReveal = !clientIdReveal; render(); });
+    const clr = $('#clientidclear');
+    if (clr) clr.addEventListener('click', () => {
+      localStorage.removeItem('sg_gclient');
+      clientIdReveal = false;
+      render();
+    });
     document.querySelectorAll('[data-theme-opt]').forEach(b => b.addEventListener('click', () => {
       Store.setSetting('theme', b.dataset.themeOpt); render();
     }));

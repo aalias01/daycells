@@ -5,7 +5,9 @@ Habit tracker with a GitHub-style contribution grid per habit. Static site. No b
 **Live app:** [https://streakgrid.vercel.app](https://streakgrid.vercel.app)  
 **Source:** [github.com/aalias01/streakgrid](https://github.com/aalias01/streakgrid) (MIT)
 
-Open the URL, tap +, start checking habits. For phone + laptop sync, create a Google OAuth Client ID (steps below), paste it in Settings, and sign in. Leave `js/config.js` empty so each person pastes their own Client ID in Settings (stored only in that browser).
+Open the live URL, tap +, start checking habits. On the live deploy, a Google OAuth Client ID is already set (via Vercel env at build time). If your Gmail is on the project’s test-user list, open Help or Settings and tap **Sign in with Google**. No paste needed.
+
+Forks and your own deploys: leave committed `js/config.js` empty. Create your own Client ID (steps below), then either set `GOOGLE_CLIENT_ID` on your host’s build env or paste it under Settings → Advanced.
 
 ## Data
 
@@ -31,9 +33,9 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 
 ## Google Drive setup (full reference)
 
-About five minutes. Free for normal personal use. The in-app **Help** tab only asks you to Sign in (or open Settings to paste a Client ID). Use **this README** when you need to create or fix the Google Cloud Client ID.
+About five minutes. Free for normal personal use. Use this section when you **create** a Client ID (forks, local serve, or your own Vercel project). On [streakgrid.vercel.app](https://streakgrid.vercel.app), skip to Sign in if you are already a test user.
 
-### Required (happy path)
+### Required (happy path for your own Client ID)
 
 1. Open [console.cloud.google.com](https://console.cloud.google.com) → create a project (any name, e.g. Habit Tracker).
 2. **APIs & Services → Library** → enable **Google Drive API**.
@@ -42,13 +44,14 @@ About five minutes. Free for normal personal use. The in-app **Help** tab only a
    - **Audience:** External. Stay in **Testing**. Under Test users, add every Gmail that should be allowed to sign in (you, spouse, etc.; Testing allows up to 100). Save.
 4. **Clients → Create client → Web application.**
    - Authorized JavaScript origins (no path, no trailing slash):
-     - `https://streakgrid.vercel.app` (the live demo), and/or
-     - your own deploy URL, and/or
+     - your deploy URL (e.g. `https://your-app.vercel.app`), and/or
      - `http://localhost:8080` for local serve
    - Leave **Authorized redirect URIs** empty.
    - Create. Copy the **Client ID** only (`….apps.googleusercontent.com`). Ignore the **Client Secret** (not used by this static app; never paste it into StreakGrid or git).
-5. StreakGrid → **Settings** → paste Client ID → **Sign in with Google**. Accept Drive + email when Google asks.
-6. Confirm Google Drive has folder **StreakGrid** / file **streakgrid-data.json**. On another device: paste the same Client ID once, sign in with the **same** Google account to sync that person’s data.
+5. Wire the Client ID (pick one):
+   - **Vercel:** Project → Settings → Environment Variables → `GOOGLE_CLIENT_ID` = that string (Production). Redeploy so `npm run build` injects it into `js/config.js`. Do not commit the filled file.
+   - **Or** StreakGrid → Settings → **Advanced: override Client ID** → paste → **Sign in with Google**.
+6. Confirm Google Drive has folder **StreakGrid** / file **streakgrid-data.json**. On another device: same account, Sign in (override paste once per browser if you are not using env inject).
 
 ### Optional: Data Access (scopes in the console)
 
@@ -84,7 +87,14 @@ Abuse risk if you **publish**: strangers can sign in on your authorized origin a
 
 ## Deploy your own
 
-Static files. Vercel / GitHub Pages / any static host. `vercel.json` is included. After code changes, bump `VERSION` in `sw.js` and redeploy (or hard-refresh) so PWAs pick up the new build.
+Static files. Vercel / GitHub Pages / any static host. `vercel.json` runs `npm run build` (Client ID inject) before publish. After code changes, bump `VERSION` in `sw.js` and redeploy (or hard-refresh) so PWAs pick up the new build.
+
+For the live-style default Client ID on **your** Vercel project:
+
+```
+vercel env add GOOGLE_CLIENT_ID production
+npx vercel --prod
+```
 
 Local serve (sign-in needs http, not `file://`):
 
@@ -92,7 +102,7 @@ Local serve (sign-in needs http, not `file://`):
 python3 -m http.server 8080
 ```
 
-Then add `http://localhost:8080` to the Client’s Authorized JavaScript origins.
+Then add `http://localhost:8080` to the Client’s Authorized JavaScript origins, and paste the Client ID under Settings → Advanced (or run `GOOGLE_CLIENT_ID=... npm run build` once before serving).
 
 ## Customize
 
@@ -103,7 +113,9 @@ Then add `http://localhost:8080` to the Client’s Authorized JavaScript origins
 ```
 index.html            shell
 css/style.css         theme
-js/config.js          leave googleClientId empty for shared deploys
+js/config.js          leave googleClientId empty in git (inject at deploy)
+scripts/inject-client-id.js  writes config from GOOGLE_CLIENT_ID
+package.json          npm run build → inject
 js/logic.js           dates, schedules, streaks, analytics
 js/store.js           browser persistence
 js/gdrive.js          Google Identity Services + Drive
@@ -116,10 +128,11 @@ icons/
 ## Troubleshoot
 
 - Sign-in fails on a raw file open: serve over http(s).
-- "No OAuth Client ID configured": paste yours in Settings (Help points here; creating one is in this README).
+- "No OAuth Client ID configured": set `GOOGLE_CLIENT_ID` on the deploy, or paste under Settings → Advanced (creating one is in this README).
 - Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://streakgrid.vercel.app`).
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync dot.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh.
 - Want Data Access filled in: add scopes manually (optional section above). Sign-in will not populate that page for you.
+- Fork Sign in does nothing useful with someone else’s Client ID on your domain: create your own Web client and origins.
