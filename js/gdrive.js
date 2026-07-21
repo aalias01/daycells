@@ -23,7 +23,8 @@ const GDrive = (() => {
 
   function unavailableReason() {
     if (!onHttp()) return 'Google sign-in needs the app served over http(s). Run: python3 -m http.server 8080, or deploy it (Vercel, GitHub Pages).';
-    if (!configured()) return 'No OAuth Client ID configured. Add one in Settings (see README → Enable Google Drive sync).';
+    if (!configured()) return 'No OAuth Client ID yet. Paste one in the OAuth Client ID field below.';
+
     if (!libReady()) return 'Google sign-in library is still loading. Try again in a moment.';
     return null;
   }

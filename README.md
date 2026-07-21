@@ -5,7 +5,7 @@ Habit tracker with a GitHub-style contribution grid per habit. Static site. No b
 **Live app:** [https://streakgrid.vercel.app](https://streakgrid.vercel.app)  
 **Source:** [github.com/aalias01/streakgrid](https://github.com/aalias01/streakgrid) (MIT)
 
-Open the URL, tap +, start checking habits. For phone + laptop sync, create a Google OAuth Client ID (steps below), paste it in Settings, and sign in. Do not put the Client Secret anywhere in the app. Leave `js/config.js` empty so each person pastes their own Client ID in Settings (stored only in that browser).
+Open the URL, tap +, start checking habits. For phone + laptop sync, create a Google OAuth Client ID (steps below), paste it in Settings, and sign in. Leave `js/config.js` empty so each person pastes their own Client ID in Settings (stored only in that browser).
 
 ## Data
 
@@ -22,12 +22,12 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- Tap the check on a card to log today. Arrows next to the date fix past days.
+- Tap the check on a card to log today. Tap the date for a calendar jump, or use the arrows for nearby days.
 - Tap a card for the 52-week map and stats. Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
 - Theme: Settings → Appearance (auto / light / dark).
 - Phone: Share → Add to Home Screen.
-- In-app **Help**: short start + a **Sign in with Google** button (requests Drive access). Full Cloud Console / Client ID steps live in this README, not in the app.
+- In-app **Help**: how to track habits, Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
 
 ## Google Drive setup (full reference)
 
@@ -116,8 +116,8 @@ icons/
 ## Troubleshoot
 
 - Sign-in fails on a raw file open: serve over http(s).
-- "No OAuth Client ID configured": paste yours in Settings.
-- Popup fails / origin error: current origin missing from Authorized JavaScript origins (Help shows the exact origin to copy).
+- "No OAuth Client ID configured": paste yours in Settings (Help points here; creating one is in this README).
+- Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://streakgrid.vercel.app`).
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync dot.

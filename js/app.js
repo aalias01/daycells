@@ -150,7 +150,8 @@
 
     $('#view').innerHTML =
       '<div class="todayhead">' +
-        '<span class="date">' + esc(nice) + (isToday ? '' : ' <small class="pastlbl">(past day)</small>') + '</span>' +
+        '<button type="button" class="date" id="pickday" aria-label="Jump to a date">' + esc(nice) + (isToday ? '' : ' <small class="pastlbl">(past day)</small>') + '</button>' +
+        '<input type="date" id="daypicker" class="daypicker" max="' + esc(today) + '" value="' + esc(iso) + '" aria-hidden="true" tabindex="-1">' +
         (due > 0 ? '<span class="chip' + (allDone ? ' on' : '') + '">' + (allDone ? 'All done ✓' : doneCount + '/' + due) + '</span>' : '') +
         '<span class="chip toggle' + (rest ? ' on' : '') + '" id="restchip" role="button">' + (rest ? '☾ rest day' : 'mark rest day') + '</span>' +
         '<span class="datenav">' +
@@ -180,6 +181,19 @@
     document.querySelectorAll('[data-open]').forEach(c => c.addEventListener('click', () => { detailId = c.dataset.open; render(); }));
     $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
     $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
+    const picker = $('#daypicker');
+    $('#pickday').addEventListener('click', () => {
+      try {
+        if (typeof picker.showPicker === 'function') picker.showPicker();
+        else { picker.focus(); picker.click(); }
+      } catch (e) { picker.focus(); picker.click(); }
+    });
+    picker.addEventListener('change', () => {
+      const v = picker.value;
+      if (!v) return;
+      viewDate = v >= today ? null : v;
+      render();
+    });
     $('#prevday').addEventListener('click', () => { viewDate = Logic.addDays(iso, -1); render(); });
     const nx = $('#nextday');
     if (nx) nx.addEventListener('click', () => {
@@ -259,41 +273,55 @@
   function renderHelp() {
     const st = Sync.state();
     const configured = GDrive.configured();
-    const reason = GDrive.unavailableReason ? GDrive.unavailableReason() : null;
 
     let driveCard;
     if (st.enabled) {
       driveCard =
-        '<div class="card help"><h2>Google Drive</h2>' +
-        '<p>Connected as <b>' + esc(st.email || '?') + '</b>. Habits sync to a <code>StreakGrid</code> folder in that account\'s Drive.</p>' +
+        '<div class="card help"><h2>Phone + laptop sync</h2>' +
+        '<p>You are signed in as <b>' + esc(st.email || '?') + '</b>. Checks sync to Google Drive (folder <code>StreakGrid</code>). Use the same Google account on your other device.</p>' +
         '<div class="btnrow">' +
           '<button class="btn" id="help-sync">Sync now</button>' +
-          '<button class="btn ghost" id="help-disconnect">Disconnect</button>' +
-        '</div></div>';
+          '<button class="btn ghost" id="help-disconnect">Sign out</button>' +
+        '</div>' +
+        '<p class="mini">If the other device looks stale, open the app there and tap Sync now (or the green/gray dot in the header).</p>' +
+        '</div>';
     } else if (configured && GDrive.onHttp()) {
       driveCard =
-        '<div class="card help"><h2>Google Drive</h2>' +
-        '<p>Tap below. Google will ask for Drive + email access. Data stays in <em>your</em> Drive; there is no StreakGrid account.</p>' +
+        '<div class="card help"><h2>Phone + laptop sync</h2>' +
+        '<p>Optional. Keeps habits in your Google Drive so a second device (or a cleared browser) can restore them.</p>' +
         '<div class="btnrow"><button class="btn" id="help-connect">Sign in with Google</button></div>' +
-        (reason ? '<p class="mini">' + esc(reason) + '</p>' : '') +
+        '<p class="mini">Google will ask for Drive access. Accept. Your habits stay in <em>your</em> Drive only.</p>' +
+        '<p class="mini">If Google says access blocked, your email is not on the app\'s test-user list. Ask whoever shared the Client ID to add your Gmail, then try again.</p>' +
+        '</div>';
+    } else if (!GDrive.onHttp()) {
+      driveCard =
+        '<div class="card help"><h2>Phone + laptop sync</h2>' +
+        '<p>Open this app from a website link (https), not as a downloaded file. Then you can sign in to Google Drive.</p>' +
         '</div>';
     } else {
       driveCard =
-        '<div class="card help"><h2>Google Drive</h2>' +
-        '<p>Paste an OAuth Client ID in Settings first, then come back and sign in. Google will ask for access.</p>' +
-        '<div class="btnrow"><button class="btn" id="helptosettings">Open Settings</button></div>' +
-        '<p class="mini">Creating a Client ID (one-time, Google Cloud) is documented in the <a href="https://github.com/aalias01/streakgrid#google-drive-setup-full-reference" target="_blank" rel="noopener">GitHub README</a>.</p>' +
+        '<div class="card help"><h2>Phone + laptop sync</h2>' +
+        '<p>Optional. First paste a Client ID in Settings (the long <code>….apps.googleusercontent.com</code> string). Someone may have shared theirs with you, or you can create one (link below).</p>' +
+        '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings to paste it</button></div>' +
+        '<p class="mini">After it is pasted, return here and you will get a <b>Sign in with Google</b> button.</p>' +
+        '<p class="mini">How to create a Client ID: <a href="https://github.com/aalias01/streakgrid#google-drive-setup-full-reference" target="_blank" rel="noopener">setup guide on GitHub</a>.</p>' +
         '</div>';
     }
 
     $('#view').innerHTML =
-      '<div class="card help"><h2>Quick start</h2>' +
-        '<p>Tap <b>+</b> to add habits. Check them off on Today. Everything is saved in this browser automatically.</p>' +
+      '<div class="card help"><h2>Track habits</h2>' +
+        '<ul>' +
+          '<li>Tap <b>+</b> to add a habit (presets or your own).</li>' +
+          '<li>On <b>Today</b>, tap the checkmark to log it.</li>' +
+          '<li>Forgot a day? Tap the date for a calendar, or use the arrows. Future days are blocked.</li>' +
+          '<li>Need a break? Tap <b>mark rest day</b> so streaks do not break.</li>' +
+        '</ul>' +
+        '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       driveCard +
-      '<div class="card help"><h2>Backups</h2>' +
-        '<p>Settings → Export JSON (full restore) or Export CSV. Drive sync is optional for phone + laptop.</p>' +
-        '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Settings</button></div>' +
+      '<div class="card help"><h2>Backup without Google</h2>' +
+        '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
+        '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
     const connect = $('#help-connect');
@@ -339,8 +367,7 @@
       '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
         '<div class="set-row"><span class="grow">OAuth Client ID</span>' +
         '<input type="text" id="clientid" placeholder="xxxx.apps.googleusercontent.com" value="' + esc(localStorage.getItem('sg_gclient') || '') + '"></div>' +
-        '<div class="mini">Your own Client ID from Google Cloud. Paste it here (stays in this browser). Do not paste the Client Secret.</div>' +
-        '<div class="mini"><button type="button" class="linkish" id="gotohelp">Need Drive sync? Open Help →</button></div>' +
+        '<div class="mini">Paste the Client ID here (stays on this device). Then tap Sign in with Google above.</div>' +
       '</div>' +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
@@ -356,15 +383,13 @@
         '<button class="btn danger" id="reset">Reset all</button></div>' +
         '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet.</div>' +
       '</div>' +
-      '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. See Help for Drive setup. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
+      '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
 
     const cn = $('#connect');
     if (cn) cn.addEventListener('click', async () => {
       try { await Sync.connect(); } catch (e) { alert(e.message); }
       render();
     });
-    const gh = $('#gotohelp');
-    if (gh) gh.addEventListener('click', () => { activeTab = 'help'; render(); window.scrollTo(0, 0); });
     const dc = $('#disconnect');
     if (dc) dc.addEventListener('click', () => { Sync.disconnect(); render(); });
     const sn = $('#syncnow');
