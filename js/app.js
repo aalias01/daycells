@@ -166,10 +166,13 @@
 
   function fmtPct(v) { return v === null ? '·' : Math.round(v * 100) + '%'; }
 
-  function fmtDelta(v) {
+  function fmtDelta(v, contextRate) {
     if (v === null) return '';
     const n = Math.round(v * 100);
-    if (!n) return ' · flat';
+    if (!n) {
+      if (contextRate !== null && contextRate !== undefined && contextRate >= 0.85) return ' · holding strong';
+      return ' · steady';
+    }
     return ' · ' + (n > 0 ? '+' : '') + n + 'pp';
   }
 
@@ -179,30 +182,88 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  function yearMonthLabels(cols) {
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let lastMonth = -1;
+    return cols.map(col => {
+      const day = col.find(c => !c.outside);
+      if (!day) return '';
+      const m = Logic.parseDate(day.iso).getMonth();
+      if (m === lastMonth) return '';
+      lastMonth = m;
+      return names[m];
+    });
+  }
+
+  function yearHeatCellHTML(c, ink, mode) {
+    if (c.outside) return '<span class="c outside"></span>';
+    let style = '';
+    if (mode === 'combined') {
+      if (c.score !== null) {
+        const sc = c.score;
+        const a = sc >= 1 ? 1 : sc >= .75 ? .75 : sc >= .5 ? .5 : sc > 0 ? .28 : 0;
+        if (a) style = 'background:' + hexToRgba(ink, a);
+      } else if (c.skip) style = 'opacity:.45';
+    } else {
+      if (c.done) style = 'background:' + esc(ink);
+      else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
+    }
+    return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '" style="' + style + '"></span>';
+  }
+
   function yearHeatHTML(cols, ink, mode) {
-    /* mode: 'combined' uses score 0-1; 'habit' uses done/skip binary */
-    return '<div class="gridfull yeargrid">' + cols.map(col =>
-      '<div class="col">' + col.map(c => {
-        if (c.outside) return '<span class="c outside"></span>';
-        let style = '';
-        if (mode === 'combined') {
-          if (c.score !== null) {
-            const sc = c.score;
-            const a = sc >= 1 ? 1 : sc >= .75 ? .75 : sc >= .5 ? .5 : sc > 0 ? .28 : 0;
-            if (a) style = 'background:' + hexToRgba(ink, a);
-          } else if (c.skip) style = 'opacity:.45';
-        } else {
-          if (c.done) style = 'background:' + esc(ink);
-          else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
-        }
-        return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '" style="' + style + '"></span>';
-      }).join('') + '</div>').join('') + '</div>';
+    const months = yearMonthLabels(cols);
+    const monthRow = '<div class="yearheatmap-months">' + months.map(m =>
+      '<span class="monthcol"><span class="monthlbl">' + esc(m) + '</span></span>'
+    ).join('') + '</div>';
+    const dowLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+    const dowCol = '<div class="yearheatmap-dows">' + dowLabels.map(d =>
+      '<span class="dowlbl">' + d + '</span>'
+    ).join('') + '</div>';
+    const grid = '<div class="gridfull yeargrid">' + cols.map(col =>
+      '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode)).join('') + '</div>'
+    ).join('') + '</div>';
+    return '<div class="yearheatmap-wrap"><div class="yearheatmap-scroll">' +
+      '<div class="yearheatmap-inner">' + monthRow +
+      '<div class="yearheatmap-body">' + dowCol + grid + '</div>' +
+      '</div></div></div>';
   }
 
   function yearPickerHTML(years, selectedYear) {
-    return '<div class="yearchips">' + years.map(y =>
+    return '<div class="yearchips" id="yearchips">' + years.map(y =>
       '<button type="button" class="yearchip' + (y === selectedYear ? ' on' : '') + '" data-year="' + y + '">' + y + '</button>'
     ).join('') + '</div>';
+  }
+
+  function centerYearHeatmap() {
+    const scroll = document.querySelector('#view .yearheatmap-scroll');
+    if (!scroll) return;
+    requestAnimationFrame(() => {
+      const maxScroll = scroll.scrollWidth - scroll.clientWidth;
+      if (maxScroll <= 0) {
+        scroll.scrollLeft = 0;
+        return;
+      }
+      const todayCell = scroll.querySelector('.yeargrid .c.today');
+      if (todayCell) {
+        const scrollRect = scroll.getBoundingClientRect();
+        const cellRect = todayCell.getBoundingClientRect();
+        const target = scroll.scrollLeft + (cellRect.left - scrollRect.left) + cellRect.width / 2 - scroll.clientWidth / 2;
+        scroll.scrollLeft = Math.max(0, Math.min(target, maxScroll));
+        return;
+      }
+      scroll.scrollLeft = maxScroll / 2;
+    });
+  }
+
+  function centerYearChip(year) {
+    const strip = document.getElementById('yearchips');
+    const chip = strip && strip.querySelector('[data-year="' + year + '"]');
+    if (!strip || !chip) return;
+    requestAnimationFrame(() => {
+      const target = chip.offsetLeft + chip.offsetWidth / 2 - strip.clientWidth / 2;
+      strip.scrollLeft = Math.max(0, Math.min(target, strip.scrollWidth - strip.clientWidth));
+    });
   }
 
   function heatLegendHTML() {
@@ -493,7 +554,7 @@
     return '<div class="statgrid">' +
       '<div class="stat"><div class="v">' + Math.round(momentum * 100) + '</div><div class="k">momentum</div></div>' +
       '<div class="stat"><div class="v">' + perfect + 'd</div><div class="k">perfect-day streak</div></div>' +
-      '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta) + '</div><div class="k">30-day rate</div></div>' +
+      '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta, r30) + '</div><div class="k">30-day rate</div></div>' +
       '<div class="stat"><div class="v stat-sm">' + weakLabel + '</div><div class="k">needs attention</div></div>' +
     '</div>';
   }
@@ -503,7 +564,8 @@
     const best = Logic.bestStreak(h, state.cells, state.skips, today);
     const stg = Logic.strength(h, state.cells, state.skips, today);
     const r30 = Logic.completionRate(h, state.cells, state.skips, 30, today);
-    const delta = Logic.rateDelta(h, state.cells, state.skips, 7, today);
+    const r30prev = Logic.completionRate(h, state.cells, state.skips, 30, Logic.addDays(today, -30));
+    const r30delta = (r30 !== null && r30prev !== null) ? r30 - r30prev : null;
     const unit = Logic.streakUnit(h);
     const chip = streakHeatChipHTML(h, cur, h.id);
     return '<div class="anafocushead">' +
@@ -514,11 +576,11 @@
     '</div>' +
     '<div class="statgrid">' +
       '<div class="stat"><div class="v">' + cur + unit + '</div><div class="k">current streak</div></div>' +
-      '<div class="stat"><div class="v">' + Math.round(stg * 100) + fmtDelta(delta) + '</div><div class="k">strength</div></div>' +
-      '<div class="stat"><div class="v">' + fmtPct(r30) + '</div><div class="k">30-day rate</div></div>' +
+      '<div class="stat"><div class="v">' + Math.round(stg * 100) + '</div><div class="k">strength</div></div>' +
+      '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta, r30) + '</div><div class="k">30-day rate</div></div>' +
       '<div class="stat"><div class="v">' + best + unit + '</div><div class="k">best streak</div></div>' +
     '</div>' +
-    '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days. Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>';
+    '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days (trend vs prior 30 days; pp = percentage points). Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>';
   }
 
   function renderAnalyticsFocusPanels(h, today, year) {
@@ -593,10 +655,10 @@
         render();
       }));
     }
-    const yg = document.querySelector('#view .yeargrid');
-    if (yg) yg.scrollLeft = yg.scrollWidth;
     const gf = document.querySelector('#view .gridfull:not(.yeargrid)');
     if (gf) gf.scrollLeft = gf.scrollWidth;
+    centerYearHeatmap();
+    centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
   }
 
