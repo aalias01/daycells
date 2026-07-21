@@ -29,19 +29,11 @@ Each person brings their own Client ID (Settings field, or empty `js/config.js` 
 
 1. [Google Cloud Console](https://console.cloud.google.com) → new project.
 2. Enable **Google Drive API**.
-3. Google Auth Platform:
-   - Branding: app name + your email
-   - Audience: External, Testing, add your Gmail as a test user
-   - Data Access → Add or remove scopes. Use the Filter box:
-     - Filter `userinfo` → check `.../auth/userinfo.email`
-     - Filter `drive.file` → check `.../auth/drive.file`
-     - Both usually land under **Your non-sensitive scopes**. Click **Update** on the panel, then **Save** on the main Data Access page. Update alone does not persist. If `drive.file` is missing from the list, enable Google Drive API first and reopen the panel.
+3. Google Auth Platform → Branding (app name + your email) → Audience (External, Testing, add your Gmail as a test user).
 4. Clients → Web application. Authorized JavaScript origins: `https://streakgrid.vercel.app` (and `http://localhost:8080` if you develop locally). No redirect URI. Ignore the Client Secret.
-5. StreakGrid → Settings → paste Client ID → Sign in with Google.
+5. StreakGrid → Settings → paste Client ID → Sign in with Google. Google will ask for Drive + email access; accept.
 
-**Order:** Data Access and the Client can be done in either order. Scopes must be Saved before Sign in works for Drive. If you created the Client first and added scopes later, Save Data Access, then Sign in again (Disconnect first if you already connected). If you added scopes first and create the Client later, paste the new Client ID and Sign in as usual.
-
-Scope is `drive.file` (files this app created) plus email for the connected-account label. Sync is offline-first: browser is the working copy; Drive merges last-write-wins per habit/day.
+Sync is offline-first: browser is the working copy; Drive holds `StreakGrid/streakgrid-data.json` (files this app created only). Merges last-write-wins per habit/day.
 
 ## Deploy your own
 
