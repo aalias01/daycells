@@ -677,7 +677,7 @@
     const canNext = ym < thisYm;
 
     let cells = '';
-    for (let i = 0; i < startDow; i++) cells += '<span class="calcell empty"></span>';
+    for (let i = 0; i < startDow; i++) cells += '<span class="calcell empty" aria-hidden="true">&nbsp;</span>';
     for (let d = 1; d <= daysInMonth; d++) {
       const iso = ym + '-' + (d < 10 ? '0' : '') + d;
       const future = iso > today;
