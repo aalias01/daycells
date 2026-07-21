@@ -589,7 +589,7 @@
         ['auto', 'light', 'dark'].map(t =>
           '<button data-theme-opt="' + t + '" class="' + (((state.settings || {}).theme || 'auto') === t ? 'on' : '') + '">' + t + '</button>').join('') +
         '</span></div>' +
-        '<div class="set-row"><span class="grow">Accent</span><span class="seg accentseg" id="accentseg">' +
+        '<div class="set-row accentrow"><span class="set-label">Accent</span><span class="seg accentseg" id="accentseg">' +
         [
           { id: 'cobalt', label: 'Cobalt', sw: '#2f6fed' },
           { id: 'ink', label: 'Ink', sw: '#2a3344' },
@@ -599,7 +599,7 @@
           { id: 'amber', label: 'Amber', sw: '#c9922a' }
         ].map(a =>
           '<button data-accent-opt="' + a.id + '" class="' + (((state.settings || {}).accent || 'cobalt') === a.id ? 'on' : '') + '">' +
-            '<span class="swatch" style="background:' + a.sw + '"></span>' + a.label +
+            '<span class="swatch" style="background:' + a.sw + '"></span><span class="alabel">' + a.label + '</span>' +
           '</button>').join('') +
         '</span></div>' +
         '<div class="set-row"><span class="grow">Streak grids</span><span class="seg" id="gridseg">' +

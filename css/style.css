@@ -478,12 +478,44 @@ button.calcell:active { transform: scale(.96); }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 6px; }
 .seg button { flex: 1; border: 0; background: var(--card); padding: 9px 6px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
 .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.set-row.accentrow {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+}
+.set-row.accentrow .set-label {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.seg.accentseg {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, auto);
+}
+.seg.accentseg button {
+  flex: none;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 5px;
+  padding: 7px 6px;
+  font-size: 11px;
+  text-align: left;
+}
+.accentseg .alabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .accentseg .swatch {
-  width: 14px; height: 14px; border-radius: 3px; display: inline-block; vertical-align: -2px; margin-right: 5px;
+  width: 14px; height: 14px; border-radius: 3px; display: block; margin: 0;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
 }
-.seg.accentseg { flex-wrap: wrap; }
-.seg.accentseg button { flex: 1 1 40%; min-width: 88px; }
 .dayschips { display: flex; gap: 5px; margin-top: 8px; }
 .dayschips button { flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--card); font-size: 12px; color: var(--muted); }
 .dayschips button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
