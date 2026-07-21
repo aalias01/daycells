@@ -745,7 +745,6 @@
   function welcomeHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Try sample data?</h2>' +
-      '<p class="lead">Load about 12 weeks of fake habits ending today, or skip and pick your own.</p>' +
       '<div class="btnrow">' +
         '<button type="button" class="btn" id="welcome-sample">Try sample</button>' +
         '<button type="button" class="btn ghost" id="welcome-skip">Skip</button>' +

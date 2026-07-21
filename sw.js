@@ -2,7 +2,7 @@
  * Strategy: stale-while-revalidate for same-origin GETs. Bump VERSION to
  * force-refresh cached assets after a deploy.
  */
-const VERSION = 'sg-v25';
+const VERSION = 'sg-v26';
 const PRECACHE = [
   './',
   'index.html',
