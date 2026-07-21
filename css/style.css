@@ -317,19 +317,20 @@ nav.tabs button.tab-nudge {
 /* habit card */
 .hcard {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: var(--shadow); padding: 12px 12px 10px; margin-bottom: 10px; cursor: pointer;
+  box-shadow: var(--shadow); padding: 10px 12px; margin-bottom: 8px;
 }
+.hcard.compact { cursor: default; }
 .hcard .top { display: flex; align-items: center; gap: 10px; }
 .hcard .emoji {
-  width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center;
-  font-size: 18px; flex: 0 0 auto; border: 1px solid var(--line);
+  width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 17px; flex: 0 0 auto; border: 1px solid var(--line);
 }
 .hcard .nm { flex: 1; min-width: 0; }
-.hcard .nm .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hcard .nm .meta { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+.hcard .nm .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14.5px; }
+.hcard .nm .meta { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
 /* square cell check */
 .hcard .check {
-  width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--line);
+  width: 38px; height: 38px; border-radius: 10px; border: 2px solid var(--line);
   background: var(--bg); color: transparent; font-size: 16px; flex: 0 0 auto;
   display: grid; place-items: center; transition: transform .12s ease, background .12s ease, border-color .12s ease;
 }
@@ -464,6 +465,49 @@ button.calcell:active { transform: scale(.96); }
 .hrow .m { width: 52px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 .strengthbar { flex: 0 0 76px; height: 6px; border-radius: 2px; background: var(--cell0); overflow: hidden; }
 .strengthbar i { display: block; height: 100%; }
+
+/* analytics */
+.seg.analyticsseg { margin: 0 0 10px; max-width: 280px; }
+.habitchips {
+  display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 10px; margin-top: -4px;
+  -webkit-overflow-scrolling: touch;
+}
+.habitchip {
+  flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 999px; padding: 6px 11px; font-size: 12px; white-space: nowrap;
+}
+.habitchip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.yearchips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.yearchip {
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  border-radius: 8px; padding: 5px 10px; font-size: 12px; font-family: var(--font-mono);
+}
+.yearchip.on { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.yeargrid .c.outside { visibility: hidden; }
+.anafocushead {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.anafocushead .emoji {
+  width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 20px; border: 1px solid var(--line); flex: 0 0 auto;
+}
+.anafocushead .grow { flex: 1; min-width: 0; }
+.anafocushead .name { font-weight: 650; font-size: 16px; font-family: var(--font-display); }
+.anafocushead .meta { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+.stat .v.stat-sm { font-size: 14px; line-height: 1.25; }
+.streakchip {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; padding: 2px 6px; border-radius: 999px; margin-left: 4px;
+  vertical-align: middle; font-family: var(--font-mono);
+}
+.streakchip.mild { background: rgba(201, 146, 42, .18); color: #a67318; }
+.streakchip.hot { background: var(--accent-soft); color: var(--accent-ink); }
+.streakchip.celebrate { animation: streakpop .45s ease; }
+@keyframes streakpop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
 
 .editor label.f { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
 .editor input[type=text], .editor input[type=number] {

@@ -185,6 +185,139 @@ const Logic = (() => {
     return req ? done / req : null;
   }
 
+  function yearWeekStarts(year) {
+    const jan1 = year + '-01-01';
+    const dec31 = year + '-12-31';
+    const weeks = [];
+    for (let wk = weekStartOf(jan1); wk <= dec31; wk = addDays(wk, 7)) weeks.push(wk);
+    return weeks;
+  }
+
+  /* Calendar-year streakmap: week columns Mon-first, days outside the year are marked outside. */
+  function streakmapCalendarYear(habit, cells, skips, year, uptoISO) {
+    return yearWeekStarts(year).map(wk => {
+      const col = [];
+      for (let i = 0; i < 7; i++) {
+        const iso = addDays(wk, i);
+        if (+iso.slice(0, 4) !== year) {
+          col.push({ iso, future: true, outside: true, done: false, skip: false, today: false });
+          continue;
+        }
+        col.push({
+          iso,
+          future: iso > uptoISO,
+          outside: false,
+          done: isDone(cells, iso, habit.id),
+          skip: isSkip(skips, iso),
+          today: iso === uptoISO
+        });
+      }
+      return col;
+    });
+  }
+
+  /* Combined year heat: score = dayScore across habits (null if nothing required). */
+  function combinedYearHeat(habits, cells, skips, year, uptoISO) {
+    const active = habits.filter(h => !h.archived && !h.deleted);
+    return yearWeekStarts(year).map(wk => {
+      const col = [];
+      for (let i = 0; i < 7; i++) {
+        const iso = addDays(wk, i);
+        if (+iso.slice(0, 4) !== year) {
+          col.push({ iso, future: true, outside: true, score: null, skip: false, today: false });
+          continue;
+        }
+        const future = iso > uptoISO;
+        col.push({
+          iso,
+          future,
+          outside: false,
+          skip: isSkip(skips, iso),
+          today: iso === uptoISO,
+          score: future ? null : dayScore(active, cells, skips, iso)
+        });
+      }
+      return col;
+    });
+  }
+
+  function dataYears(habits, cells) {
+    const cur = new Date().getFullYear();
+    let minY = cur;
+    for (const h of habits) {
+      const start = habitStartDate(h, cells);
+      if (start) minY = Math.min(minY, +start.slice(0, 4));
+    }
+    const out = [];
+    for (let y = minY; y <= cur; y++) out.push(y);
+    return out;
+  }
+
+  function perfectDayStreak(habits, cells, skips, uptoISO) {
+    const active = habits.filter(h => !h.archived && !h.deleted);
+    let streak = 0;
+    let iso = uptoISO;
+    for (;;) {
+      let req = 0, done = 0;
+      for (const h of active) {
+        const d = isDone(cells, iso, h.id);
+        const r = isPerWeek(h) ? d : isRequired(h, iso, skips);
+        if (d) { done++; req++; }
+        else if (r) req++;
+      }
+      if (!req) { iso = addDays(iso, -1); if (iso < '2000-01-01') break; continue; }
+      if (done === req) { streak++; iso = addDays(iso, -1); if (iso < '2000-01-01') break; continue; }
+      if (iso === uptoISO) break;
+      break;
+    }
+    return streak;
+  }
+
+  function lastDoneDate(habit, cells, uptoISO) {
+    const start = habitStartDate(habit, cells);
+    if (!start) return null;
+    for (let iso = uptoISO; iso >= start; iso = addDays(iso, -1)) {
+      if (isDone(cells, iso, habit.id)) return iso;
+    }
+    return null;
+  }
+
+  function dowShareBreakdown(habit, cells) {
+    const counts = dowBreakdown(habit, cells);
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (!total) return counts.map(() => 0);
+    return counts.map(n => n / total);
+  }
+
+  function avgStrength(habits, cells, skips, uptoISO) {
+    if (!habits.length) return 0;
+    let sum = 0;
+    for (const h of habits) sum += strength(h, cells, skips, uptoISO);
+    return sum / habits.length;
+  }
+
+  function weakestHabit(habits, cells, skips, uptoISO) {
+    let worst = null, worstS = Infinity;
+    for (const h of habits) {
+      const s = strength(h, cells, skips, uptoISO);
+      if (s < worstS) { worstS = s; worst = h; }
+    }
+    return worst;
+  }
+
+  function aggregateRate(habits, cells, skips, nDays, uptoISO) {
+    const rates = habits.map(h => completionRate(h, cells, skips, nDays, uptoISO)).filter(r => r !== null);
+    return rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+  }
+
+  function rateDelta(habit, cells, skips, nDays, uptoISO) {
+    const r1 = completionRate(habit, cells, skips, nDays, uptoISO);
+    const priorEnd = addDays(uptoISO, -nDays);
+    const r0 = completionRate(habit, cells, skips, nDays, priorEnd);
+    if (r1 === null || r0 === null) return null;
+    return r1 - r0;
+  }
+
   /* streakmap column data: nWeeks columns of 7, Monday-first, ending at uptoISO's week */
   function streakmapWeeks(habit, cells, skips, nWeeks, uptoISO) {
     const lastWk = weekStartOf(uptoISO);
@@ -212,8 +345,9 @@ const Logic = (() => {
     fmtDate, parseDate, addDays, diffDays, todayISO, dowMon, weekStartOf,
     cellKey, isDone, isSkip, isRequired, isPerWeek, weekTarget,
     habitStartDate, weekDoneCount, currentStreak, bestStreak, streakUnit,
-    strength, completionRate, totalDone, dowBreakdown, monthlyCounts,
-    dayScore, streakmapWeeks
+    strength, completionRate, totalDone, dowBreakdown, dowShareBreakdown, monthlyCounts,
+    dayScore, streakmapWeeks, streakmapCalendarYear, combinedYearHeat, dataYears,
+    perfectDayStreak, lastDoneDate, avgStrength, weakestHabit, aggregateRate, rateDelta
   };
 })();
 

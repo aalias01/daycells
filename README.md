@@ -25,7 +25,8 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
 - Tap the check on a card to log today. Tap the date for a calendar jump, or use the arrows for nearby days.
-- Tap a card for the 52-week map and stats. Rest day makes every habit optional without breaking streaks.
+- **Analytics:** **All** mode shows portfolio momentum, a calendar-year heatmap, and per-habit summary rows. **Focus one** drills into a single habit (streakmap, weekday share, 6-month trend) without leaving the tab.
+- Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - Theme: Settings → Appearance (auto / light / dark), accent pack (Cobalt / Ink / Teal / Fern / Violet / Amber), streak grids Accent or By habit.

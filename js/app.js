@@ -9,13 +9,17 @@
   let state = null;
   let activeTab = 'today';
   let syncStatus = { s: 'off', detail: '' };
-  let detailId = null;   // open habit detail
+  let detailId = null;   // open habit detail (legacy sheet; Today no longer opens it)
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let welcomeOpen = false;
   let sampleTipOpen = false;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
+  let analyticsMode = 'all';       // 'all' | 'focus'
+  let analyticsFocusHabitId = null;
+  let analyticsYear = null;        // null = current calendar year
+  let analyticsMapPage = 0;        // focus inline 52-week map paging
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
   let calMonth = null;   // 'YYYY-MM' while calendar is open
@@ -135,6 +139,108 @@
       return (s.days || []).map(d => names[d]).join(' · ') || 'No days set';
     }
     return (s.target || 1) + '× / week';
+  }
+
+  const STREAK_CELEB_KEY = 'sg_streak_celebrate';
+  const STREAK_TIER_RANK = { none: 0, mild: 1, hot: 2 };
+  let streakCelebrated = {};
+  try { streakCelebrated = JSON.parse(localStorage.getItem(STREAK_CELEB_KEY) || '{}'); } catch (e) { streakCelebrated = {}; }
+
+  function streakHeatTier(h, streak) {
+    if (Logic.isPerWeek(h)) {
+      if (streak >= 4) return 'hot';
+      if (streak >= 2) return 'mild';
+      return 'none';
+    }
+    if (streak >= 7) return 'hot';
+    if (streak >= 3) return 'mild';
+    return 'none';
+  }
+
+  function streakHeatChipHTML(h, streak, habitId) {
+    const tier = streakHeatTier(h, streak);
+    if (tier === 'none') return '';
+    const label = tier === 'hot' ? 'Hot' : 'Mild';
+    return '<span class="streakchip ' + tier + '" data-streak-chip="' + esc(habitId || h.id) + '">' + label + '</span>';
+  }
+
+  function fmtPct(v) { return v === null ? '·' : Math.round(v * 100) + '%'; }
+
+  function fmtDelta(v) {
+    if (v === null) return '';
+    const n = Math.round(v * 100);
+    if (!n) return ' · flat';
+    return ' · ' + (n > 0 ? '+' : '') + n + 'pp';
+  }
+
+  function fmtLastDone(iso) {
+    if (!iso) return 'never';
+    const d = Logic.parseDate(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function yearHeatHTML(cols, ink, mode) {
+    /* mode: 'combined' uses score 0-1; 'habit' uses done/skip binary */
+    return '<div class="gridfull yeargrid">' + cols.map(col =>
+      '<div class="col">' + col.map(c => {
+        if (c.outside) return '<span class="c outside"></span>';
+        let style = '';
+        if (mode === 'combined') {
+          if (c.score !== null) {
+            const sc = c.score;
+            const a = sc >= 1 ? 1 : sc >= .75 ? .75 : sc >= .5 ? .5 : sc > 0 ? .28 : 0;
+            if (a) style = 'background:' + hexToRgba(ink, a);
+          } else if (c.skip) style = 'opacity:.45';
+        } else {
+          if (c.done) style = 'background:' + esc(ink);
+          else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
+        }
+        return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '" style="' + style + '"></span>';
+      }).join('') + '</div>').join('') + '</div>';
+  }
+
+  function yearPickerHTML(years, selectedYear) {
+    return '<div class="yearchips">' + years.map(y =>
+      '<button type="button" class="yearchip' + (y === selectedYear ? ' on' : '') + '" data-year="' + y + '">' + y + '</button>'
+    ).join('') + '</div>';
+  }
+
+  function heatLegendHTML() {
+    return '<span class="heatswatch" style="background:var(--cell0)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat1)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat2)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat3)"></span>' +
+      '<span class="heatswatch" style="background:var(--heat4)"></span>' +
+      ' less → more';
+  }
+
+  function checkStreakCelebrations(habits) {
+    const today = Logic.todayISO();
+    const upgraded = [];
+    let changed = false;
+    habits.forEach(h => {
+      const tier = streakHeatTier(h, Logic.currentStreak(h, state.cells, state.skips, today));
+      const prev = streakCelebrated[h.id] || 'none';
+      if (STREAK_TIER_RANK[tier] > STREAK_TIER_RANK[prev]) {
+        upgraded.push({ id: h.id, tier });
+        streakCelebrated[h.id] = tier;
+        changed = true;
+      } else if (STREAK_TIER_RANK[tier] < STREAK_TIER_RANK[prev]) {
+        streakCelebrated[h.id] = tier;
+        changed = true;
+      }
+    });
+    if (changed) {
+      try { localStorage.setItem(STREAK_CELEB_KEY, JSON.stringify(streakCelebrated)); } catch (e) {}
+    }
+    upgraded.forEach(u => {
+      const el = document.querySelector('[data-streak-chip="' + u.id + '"]');
+      if (el) {
+        el.classList.add('celebrate', 'celebrate-' + u.tier);
+        setTimeout(() => el.classList.remove('celebrate', 'celebrate-' + u.tier), 600);
+      }
+      if (navigator.vibrate) { try { navigator.vibrate(u.tier === 'hot' ? [10, 30, 10] : 12); } catch (e) {} }
+    });
   }
 
   // ---------- streakmap builders ----------
@@ -309,7 +415,7 @@
       const ink = gridInk(h);
       const perWeekNote = Logic.isPerWeek(h)
         ? ' · ' + Logic.weekDoneCount(h, state.cells, Logic.weekStartOf(iso), iso) + '/' + Logic.weekTarget(h) + ' this wk' : '';
-      return '<div class="hcard" data-open="' + h.id + '" role="button" aria-label="' + esc(h.name) + ' details">' +
+      return '<div class="hcard compact">' +
         '<div class="top">' +
           '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
           '<span class="nm"><div class="name">' + esc(h.name) + '</div>' +
@@ -318,7 +424,7 @@
             ' aria-label="' + esc(h.name) + (done ? ': done, tap to undo' : ': mark done') + '" aria-pressed="' + done + '"' +
             ' data-color="' + esc(ink) + '"' +
             ' style="' + (done ? 'background:' + esc(ink) + ';border-color:' + esc(ink) : '') + '">✓</button>' +
-        '</div>' + miniMap(h, 18) + '</div>';
+        '</div></div>';
     }).join('');
 
     if (!habits.length) {
@@ -354,7 +460,6 @@
       Store.toggleCell(iso, id);
       setTimeout(render, 160);
     }));
-    document.querySelectorAll('[data-open]').forEach(c => c.addEventListener('click', () => { detailId = c.dataset.open; render(); }));
     $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
     $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
     $('#pickday').addEventListener('click', () => {
@@ -375,75 +480,189 @@
   }
 
   // ---------- Analytics ----------
+  function renderAnalyticsAllOverview(habits, today) {
+    const momentum = Logic.avgStrength(habits, state.cells, state.skips, today);
+    const perfect = Logic.perfectDayStreak(habits, state.cells, state.skips, today);
+    const r30 = Logic.aggregateRate(habits, state.cells, state.skips, 30, today);
+    const r30prev = Logic.aggregateRate(habits, state.cells, state.skips, 30, Logic.addDays(today, -30));
+    const r30delta = (r30 !== null && r30prev !== null) ? r30 - r30prev : null;
+    const weak = Logic.weakestHabit(habits, state.cells, state.skips, today);
+    const weakLabel = weak
+      ? esc(weak.emoji) + ' ' + esc(weak.name)
+      : '·';
+    return '<div class="statgrid">' +
+      '<div class="stat"><div class="v">' + Math.round(momentum * 100) + '</div><div class="k">momentum</div></div>' +
+      '<div class="stat"><div class="v">' + perfect + 'd</div><div class="k">perfect-day streak</div></div>' +
+      '<div class="stat"><div class="v">' + fmtPct(r30) + fmtDelta(r30delta) + '</div><div class="k">30-day rate</div></div>' +
+      '<div class="stat"><div class="v stat-sm">' + weakLabel + '</div><div class="k">needs attention</div></div>' +
+    '</div>';
+  }
+
+  function renderAnalyticsFocusOverview(h, today) {
+    const cur = Logic.currentStreak(h, state.cells, state.skips, today);
+    const best = Logic.bestStreak(h, state.cells, state.skips, today);
+    const stg = Logic.strength(h, state.cells, state.skips, today);
+    const r30 = Logic.completionRate(h, state.cells, state.skips, 30, today);
+    const delta = Logic.rateDelta(h, state.cells, state.skips, 7, today);
+    const unit = Logic.streakUnit(h);
+    const chip = streakHeatChipHTML(h, cur, h.id);
+    return '<div class="anafocushead">' +
+      '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
+      '<span class="grow"><div class="name">' + esc(h.name) + ' ' + chip + '</div>' +
+        '<div class="meta">' + esc(scheduleLabel(h)) + ' · last done ' + fmtLastDone(Logic.lastDoneDate(h, state.cells, today)) + '</div></span>' +
+      '<button type="button" class="btn ghost" id="inlineedit">Edit</button>' +
+    '</div>' +
+    '<div class="statgrid">' +
+      '<div class="stat"><div class="v">' + cur + unit + '</div><div class="k">current streak</div></div>' +
+      '<div class="stat"><div class="v">' + Math.round(stg * 100) + fmtDelta(delta) + '</div><div class="k">strength</div></div>' +
+      '<div class="stat"><div class="v">' + fmtPct(r30) + '</div><div class="k">30-day rate</div></div>' +
+      '<div class="stat"><div class="v">' + best + unit + '</div><div class="k">best streak</div></div>' +
+    '</div>' +
+    '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days. Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>';
+  }
+
+  function renderAnalyticsFocusPanels(h, today, year) {
+    const ink = gridInk(h);
+    const dow = Logic.dowShareBreakdown(h, state.cells);
+    const dowMax = Math.max.apply(null, dow.concat([.01]));
+    const months = Logic.monthlyCounts(h, state.cells, 6, today);
+    const moMax = Math.max.apply(null, months.map(m => m.count).concat([1]));
+    const endISO = Logic.addDays(today, -364 * analyticsMapPage);
+    const startISO = Logic.addDays(Logic.weekStartOf(endISO), -7 * 51);
+    const first = Logic.habitStartDate(h, state.cells);
+    const olderExists = first && first < startISO;
+    const rangeLbl = analyticsMapPage === 0 ? 'last 52 weeks'
+      : startISO.slice(0, 10) + ' to ' + endISO.slice(0, 10);
+    return '<div class="card"><h2>Streakmap · ' + rangeLbl + ' · tap to edit any day</h2>' +
+      fullMap(h, 52, endISO) +
+      '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span>Full color = done · faint = rest day</span>' +
+        '<span><button type="button" class="pagebtn" id="anamapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
+        '<button type="button" class="pagebtn" id="anamapnewer"' + (analyticsMapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
+      '</div></div>' +
+      '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
+        '<div class="b"><b>' + Math.round(n * 100) + '%</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>' +
+      '<div class="mini">Share of completions on each weekday (not raw counts).</div></div>' +
+      '<div class="card"><h2>Last 6 months</h2><div class="bars">' + months.map(m =>
+        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>';
+  }
+
+  function renderAnalyticsAllRows(habits, today) {
+    return habits.map(h => {
+      const st = Logic.strength(h, state.cells, state.skips, today);
+      const r7 = Logic.completionRate(h, state.cells, state.skips, 7, today);
+      const r30 = Logic.completionRate(h, state.cells, state.skips, 30, today);
+      const cur = Logic.currentStreak(h, state.cells, state.skips, today);
+      const chip = streakHeatChipHTML(h, cur, h.id);
+      return '<div class="hrow">' +
+        '<span class="nm">' + esc(h.emoji) + ' ' + esc(h.name) + ' ' + chip + '</span>' +
+        '<span class="strengthbar"><i style="width:' + Math.round(st * 100) + '%;background:' + esc(h.color) + '"></i></span>' +
+        '<span class="m">' + fmtPct(r7) + '</span><span class="m">' + fmtPct(r30) + '</span></div>';
+    }).join('');
+  }
+
+  function wireAnalytics(habits) {
+    document.querySelectorAll('[data-analytics-mode]').forEach(b => b.addEventListener('click', () => {
+      analyticsMode = b.dataset.analyticsMode;
+      if (analyticsMode === 'focus' && !analyticsFocusHabitId && habits.length) {
+        analyticsFocusHabitId = habits[0].id;
+      }
+      analyticsMapPage = 0;
+      render();
+    }));
+    document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
+      analyticsMode = 'focus';
+      analyticsFocusHabitId = b.dataset.focusHabit;
+      analyticsMapPage = 0;
+      render();
+    }));
+    document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
+      analyticsYear = +b.dataset.year;
+      render();
+    }));
+    const edit = $('#inlineedit');
+    if (edit) edit.addEventListener('click', () => openEditor(analyticsFocusHabitId));
+    const older = $('#anamapolder'), newer = $('#anamapnewer');
+    if (older) older.addEventListener('click', () => { analyticsMapPage++; render(); });
+    if (newer) newer.addEventListener('click', () => { analyticsMapPage = Math.max(0, analyticsMapPage - 1); render(); });
+    const focusH = habits.find(h => h.id === analyticsFocusHabitId);
+    if (focusH) {
+      document.querySelectorAll('#view [data-cell]').forEach(c => c.addEventListener('click', () => {
+        if (c.dataset.cell > Logic.todayISO()) return;
+        Store.toggleCell(c.dataset.cell, focusH.id);
+        render();
+      }));
+    }
+    const yg = document.querySelector('#view .yeargrid');
+    if (yg) yg.scrollLeft = yg.scrollWidth;
+    const gf = document.querySelector('#view .gridfull:not(.yeargrid)');
+    if (gf) gf.scrollLeft = gf.scrollWidth;
+    checkStreakCelebrations(habits);
+  }
+
   function renderAnalytics() {
     const today = Logic.todayISO();
     const habits = Store.activeHabits();
     if (!habits.length) { $('#view').innerHTML = '<div class="empty"><div class="big">📊</div>Add habits to see analytics.</div>'; return; }
 
-    let reqToday = 0, doneToday = 0, bestCur = 0, bestName = '';
-    let rates = [];
-    for (const h of habits) {
-      const done = Logic.isDone(state.cells, today, h.id);
-      if (done) { doneToday++; reqToday++; }
-      else if (Logic.isRequired(h, today, state.skips)) reqToday++;
-      const s = Logic.currentStreak(h, state.cells, state.skips, today);
-      if (s > bestCur) { bestCur = s; bestName = h.name; }
-      const r = Logic.completionRate(h, state.cells, state.skips, 30, today);
-      if (r !== null) rates.push(r);
+    if (analyticsMode === 'focus') {
+      if (!analyticsFocusHabitId || !habits.some(h => h.id === analyticsFocusHabitId)) {
+        analyticsFocusHabitId = habits[0].id;
+      }
     }
-    const avgRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
 
-    /* combined heatmap: dayScore levels in accent */
+    const years = Logic.dataYears(habits, state.cells);
+    let year = analyticsYear || years[years.length - 1];
+    if (years.indexOf(year) === -1) {
+      year = years[years.length - 1];
+      analyticsYear = year;
+    }
+
     const accent = accentHex();
-    const cols = Logic.streakmapWeeks({ id: '__none__', schedule: { kind: 'daily' } }, {}, state.skips, 26, today);
-    const hm = '<div class="gridfull">' + cols.map(col => '<div class="col">' + col.map(c => {
-      if (c.future) return '<span class="c future"></span>';
-      const sc = Logic.dayScore(habits, state.cells, state.skips, c.iso);
-      let style = '';
-      if (sc !== null) {
-        const a = sc >= 1 ? 1 : sc >= .75 ? .75 : sc >= .5 ? .5 : sc > 0 ? .28 : 0;
-        if (a) style = 'background:' + hexToRgba(accent, a);
-      } else if (c.skip) style = 'opacity:.45';
-      return '<span class="c' + (c.today ? ' today' : '') + '" style="' + style + '"></span>';
-    }).join('') + '</div>').join('') + '</div>';
+    const modeSeg = '<div class="seg analyticsseg" id="analyticsseg">' +
+      '<button type="button" data-analytics-mode="all" class="' + (analyticsMode === 'all' ? 'on' : '') + '">All</button>' +
+      '<button type="button" data-analytics-mode="focus" class="' + (analyticsMode === 'focus' ? 'on' : '') + '">Focus one</button>' +
+    '</div>';
 
-    /* overall day-of-week: average of per-habit shares */
-    const dowTotals = [0, 0, 0, 0, 0, 0, 0];
-    habits.forEach(h => Logic.dowBreakdown(h, state.cells).forEach((n, i) => dowTotals[i] += n));
-    const dowMax = Math.max.apply(null, dowTotals.concat([1]));
-    const dowBars = '<div class="bars">' + dowTotals.map((n, i) =>
-      '<div class="b"><b>' + n + '</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + hexToRgba(accent, .85) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>';
+    const focusChips = analyticsMode === 'focus'
+      ? '<div class="habitchips">' + habits.map(h =>
+          '<button type="button" class="habitchip' + (h.id === analyticsFocusHabitId ? ' on' : '') + '" data-focus-habit="' + h.id + '">' +
+            esc(h.emoji) + ' ' + esc(h.name) + '</button>').join('') + '</div>'
+      : '';
 
-    const rows = habits.map(h => {
-      const st = Logic.strength(h, state.cells, state.skips, today);
-      const r7 = Logic.completionRate(h, state.cells, state.skips, 7, today);
-      const r30 = Logic.completionRate(h, state.cells, state.skips, 30, today);
-      const f = v => v === null ? '·' : Math.round(v * 100) + '%';
-      return '<div class="hrow"><span class="nm">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
-        '<span class="strengthbar"><i style="width:' + Math.round(st * 100) + '%;background:' + esc(h.color) + '"></i></span>' +
-        '<span class="m">' + f(r7) + '</span><span class="m">' + f(r30) + '</span></div>';
-    }).join('');
+    let yearHeat, heatTitle, heatLegendNote;
+    if (analyticsMode === 'focus') {
+      const h = habits.find(x => x.id === analyticsFocusHabitId);
+      const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
+      yearHeat = yearHeatHTML(cols, gridInk(h), 'habit');
+      heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
+      heatLegendNote = 'Full color = done · faint = rest day';
+    } else {
+      const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
+      yearHeat = yearHeatHTML(cols, accent, 'combined');
+      heatTitle = 'All habits · ' + year;
+      heatLegendNote = 'Cell shade = share of scheduled habits completed that day';
+    }
 
-    const heatLegend =
-      '<span class="heatswatch" style="background:var(--cell0)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat1)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat2)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat3)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat4)"></span>' +
-      ' idle → full day';
+    const overview = analyticsMode === 'focus'
+      ? renderAnalyticsFocusOverview(habits.find(x => x.id === analyticsFocusHabitId), today)
+      : renderAnalyticsAllOverview(habits, today);
+
+    const body = analyticsMode === 'focus'
+      ? renderAnalyticsFocusPanels(habits.find(x => x.id === analyticsFocusHabitId), today, year)
+      : '<div class="card"><h2>Per habit · strength / 7d / 30d</h2>' + renderAnalyticsAllRows(habits, today) +
+        '<div class="mini">Strength is an exponentially weighted average (Loop Habit Tracker model): a miss dents it, it never zeroes like a streak. Rest days never penalize.</div></div>';
 
     $('#view').innerHTML =
-      '<div class="card"><h2>Overview</h2><div class="statgrid">' +
-        '<div class="stat"><div class="v">' + doneToday + '/' + reqToday + '</div><div class="k">today</div></div>' +
-        '<div class="stat"><div class="v">' + bestCur + '</div><div class="k">longest live streak' + (bestName ? ' · ' + esc(bestName) : '') + '</div></div>' +
-        '<div class="stat"><div class="v">' + (avgRate === null ? '·' : Math.round(avgRate * 100) + '%') + '</div><div class="k">30-day rate</div></div>' +
-        '<div class="stat"><div class="v">' + habits.length + '</div><div class="k">active habits</div></div>' +
-      '</div></div>' +
-      '<div class="card"><h2>All habits · 26 weeks</h2>' + hm +
-        '<div class="maplegend">' + heatLegend + '<br>Cell shade = share of scheduled habits completed that day. Tap a habit on Today for its own streakmap.</div></div>' +
-      '<div class="card"><h2>Completions by weekday</h2>' + dowBars + '</div>' +
-      '<div class="card"><h2>Per habit · strength / 7d / 30d</h2>' + rows +
-        '<div class="mini">Strength is an exponentially weighted average (Loop Habit Tracker model): a miss dents it, it never zeroes like a streak. Rest days never penalize.</div></div>';
+      '<div class="card"><h2>Overview</h2>' + modeSeg + overview + '</div>' +
+      focusChips +
+      '<div class="card"><h2>' + heatTitle + '</h2>' +
+        yearPickerHTML(years, year) +
+        yearHeat +
+        '<div class="maplegend">' + heatLegendHTML() + '<br>' + heatLegendNote + '</div></div>' +
+      body;
+
+    wireAnalytics(habits);
   }
 
   // ---------- Help ----------
@@ -489,13 +708,13 @@
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
-          '<li>On <b>Today</b>, tap the <b>checkmark</b> to log it. The mini grid on the card is recent weeks at a glance.</li>' +
-          '<li>Tap the <b>habit card</b> (name or grid, not the check) for the 52-week map, strength, and stats. Edit or delete from there too.</li>' +
+          '<li>On <b>Today</b>, tap the <b>checkmark</b> to log it. Cards are compact check rows only.</li>' +
+          '<li><b>Analytics</b> has an <b>All</b> portfolio view and a <b>Focus one</b> mode for a single habit\'s streakmap, stats, and calendar-year heat.</li>' +
           '<li>Forgot a day? Tap the date for a calendar, or use the arrows. Future days are blocked.</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional: add a one-line <b>note</b> under Today for that day.</li>' +
         '</ul>' +
-        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory).</p>' +
+        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory). <b>Mild/Hot</b> chips flag streak momentum in Analytics.</p>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       driveCard +
