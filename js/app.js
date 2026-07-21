@@ -257,57 +257,58 @@
 
   // ---------- Help ----------
   function renderHelp() {
-    const origin = location.origin;
+    const st = Sync.state();
+    const configured = GDrive.configured();
+    const reason = GDrive.unavailableReason ? GDrive.unavailableReason() : null;
+
+    let driveCard;
+    if (st.enabled) {
+      driveCard =
+        '<div class="card help"><h2>Google Drive</h2>' +
+        '<p>Connected as <b>' + esc(st.email || '?') + '</b>. Habits sync to a <code>StreakGrid</code> folder in that account\'s Drive.</p>' +
+        '<div class="btnrow">' +
+          '<button class="btn" id="help-sync">Sync now</button>' +
+          '<button class="btn ghost" id="help-disconnect">Disconnect</button>' +
+        '</div></div>';
+    } else if (configured && GDrive.onHttp()) {
+      driveCard =
+        '<div class="card help"><h2>Google Drive</h2>' +
+        '<p>Tap below. Google will ask for Drive + email access. Data stays in <em>your</em> Drive; there is no StreakGrid account.</p>' +
+        '<div class="btnrow"><button class="btn" id="help-connect">Sign in with Google</button></div>' +
+        (reason ? '<p class="mini">' + esc(reason) + '</p>' : '') +
+        '</div>';
+    } else {
+      driveCard =
+        '<div class="card help"><h2>Google Drive</h2>' +
+        '<p>Paste an OAuth Client ID in Settings first, then come back and sign in. Google will ask for access.</p>' +
+        '<div class="btnrow"><button class="btn" id="helptosettings">Open Settings</button></div>' +
+        '<p class="mini">Creating a Client ID (one-time, Google Cloud) is documented in the <a href="https://github.com/aalias01/streakgrid#google-drive-setup-full-reference" target="_blank" rel="noopener">GitHub README</a>.</p>' +
+        '</div>';
+    }
+
     $('#view').innerHTML =
-      '<div class="card help"><h2>What this app is</h2>' +
-        '<p>StreakGrid tracks habits with a contribution grid. It runs entirely in your browser. Optional sync writes one JSON file to <em>your</em> Google Drive. There is no StreakGrid account.</p>' +
+      '<div class="card help"><h2>Quick start</h2>' +
+        '<p>Tap <b>+</b> to add habits. Check them off on Today. Everything is saved in this browser automatically.</p>' +
       '</div>' +
-      '<div class="card help"><h2>Saving data</h2>' +
-        '<ul>' +
-          '<li><b>Browser:</b> every check-in is saved on this device automatically.</li>' +
-          '<li><b>Export:</b> Settings → Export JSON (full backup) or Export CSV.</li>' +
-          '<li><b>Drive sync:</b> phone + laptop, and recovery if you clear site data. Needs your own OAuth Client ID (below).</li>' +
-        '</ul>' +
-      '</div>' +
-      '<div class="card help"><h2>Set up Google Drive sync</h2>' +
-        '<p>About five minutes. Free for normal personal use. You need a Google account.</p>' +
-        '<p class="originbox">Add this exact origin in Google Cloud (step 4):<br><code id="helporigin">' + esc(origin) + '</code>' +
-        ' <button type="button" class="btn ghost" id="copyorigin">Copy</button></p>' +
-        '<ol class="helpol">' +
-          '<li>Open <a href="https://console.cloud.google.com" target="_blank" rel="noopener">console.cloud.google.com</a> and create a project (any name).</li>' +
-          '<li><b>APIs &amp; Services → Library</b> → enable <b>Google Drive API</b>.</li>' +
-          '<li><b>Google Auth Platform</b> (search “oauth” if you do not see it):' +
-            '<ul>' +
-              '<li><b>Branding:</b> app name (e.g. StreakGrid) and your email. Save.</li>' +
-              '<li><b>Audience:</b> External. Stay in <b>Testing</b>. Add your Gmail under Test users. Save.</li>' +
-            '</ul>' +
-          '</li>' +
-          '<li><b>Clients → Create client → Web application.</b> Under Authorized JavaScript origins, add the origin shown above. Leave redirect URIs empty. Create. Copy the <b>Client ID</b> only. Ignore the Client Secret.</li>' +
-          '<li>Back here: <b>Settings</b> → paste the Client ID → <b>Sign in with Google</b>. Google asks for Drive + email access; accept.</li>' +
-        '</ol>' +
-        '<p class="mini">After sign-in, Drive should show a folder named <code>StreakGrid</code> with <code>streakgrid-data.json</code>. On a second device, paste the same Client ID once, sign in with the same Google account.</p>' +
-      '</div>' +
-      '<div class="card help"><h2>If something fails</h2>' +
-        '<ul>' +
-          '<li><b>Popup fails / origin error:</b> the origin above is missing from your OAuth client.</li>' +
-          '<li><b>Access blocked:</b> your Gmail is not in Audience → Test users (or publish the OAuth app).</li>' +
-          '<li><b>No Client ID configured:</b> paste it in Settings and wait a moment, then Sign in again.</li>' +
-          '<li><b>Data missing after clearing the browser:</b> Sign in again to pull Drive, or import a JSON export.</li>' +
-        '</ul>' +
-        '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings</button></div>' +
+      driveCard +
+      '<div class="card help"><h2>Backups</h2>' +
+        '<p>Settings → Export JSON (full restore) or Export CSV. Drive sync is optional for phone + laptop.</p>' +
+        '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Settings</button></div>' +
       '</div>';
 
-    $('#copyorigin').addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(origin);
-        const b = $('#copyorigin');
-        b.textContent = 'Copied';
-        setTimeout(() => { b.textContent = 'Copy'; }, 1500);
-      } catch (e) {
-        prompt('Copy this origin:', origin);
-      }
+    const connect = $('#help-connect');
+    if (connect) connect.addEventListener('click', async () => {
+      try { await Sync.connect(); } catch (e) { alert(e.message); }
+      render();
     });
-    $('#helptosettings').addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
+    const syncBtn = $('#help-sync');
+    if (syncBtn) syncBtn.addEventListener('click', () => { Sync.fullSync(true).catch(e => alert(e.message)); });
+    const disc = $('#help-disconnect');
+    if (disc) disc.addEventListener('click', () => { Sync.disconnect(); render(); });
+    const toSet = $('#helptosettings');
+    if (toSet) toSet.addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
+    const toSet2 = $('#helptosettings2');
+    if (toSet2) toSet2.addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
   }
 
   // ---------- Settings ----------
@@ -339,7 +340,7 @@
         '<div class="set-row"><span class="grow">OAuth Client ID</span>' +
         '<input type="text" id="clientid" placeholder="xxxx.apps.googleusercontent.com" value="' + esc(localStorage.getItem('sg_gclient') || '') + '"></div>' +
         '<div class="mini">Your own Client ID from Google Cloud. Paste it here (stays in this browser). Do not paste the Client Secret.</div>' +
-        '<div class="mini"><button type="button" class="linkish" id="gotohelp">How to create a Client ID (Help) →</button></div>' +
+        '<div class="mini"><button type="button" class="linkish" id="gotohelp">Need Drive sync? Open Help →</button></div>' +
       '</div>' +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
