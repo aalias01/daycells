@@ -108,6 +108,34 @@ const Sync = (() => {
     setStatus('pending');
   }
 
+  /* After Reset all: write blank local doc to Drive without merging (merge would resurrect remote data). */
+  async function overwriteRemoteBlank() {
+    if (!state().enabled) return;
+    clearTimeout(timer);
+    timer = null;
+    queued = false;
+    const blank = deps.getDoc();
+    setStatus('syncing');
+    try {
+      if (!fileId) {
+        const r = await GDrive.ensureFile(blank);
+        fileId = r.fileId;
+        if (r.created) {
+          lastSync = Date.now();
+          setStatus('ok');
+          return;
+        }
+      }
+      await GDrive.writeFile(fileId, blank);
+      lastSync = Date.now();
+      setStatus('ok');
+    } catch (err) {
+      const authy = /sign-in|401|none|credential/i.test(err.message || '');
+      setStatus(authy ? 'auth' : 'error', err.message);
+      throw err;
+    }
+  }
+
   async function connect() {
     await GDrive.getToken(true);
     const email = await GDrive.userEmail();
@@ -138,7 +166,7 @@ const Sync = (() => {
 
   function init(d) { deps = d; }
 
-  return { init, connect, disconnect, resume, schedulePush, fullSync, state, mergeDocs, mergeById, mergeKeyed };
+  return { init, connect, disconnect, resume, schedulePush, fullSync, overwriteRemoteBlank, state, mergeDocs, mergeById, mergeKeyed };
 })();
 
 if (typeof module !== 'undefined') module.exports = Sync;

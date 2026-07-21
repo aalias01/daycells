@@ -30,7 +30,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - Theme: Settings → Appearance (auto / light / dark), accent pack (Cobalt / Ink / Teal / Fern / Violet / Amber), streak grids Accent or By habit.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
-- **Try with sample data:** on first visit (no habits yet), the welcome screen offers **Try sample data**: about 12 weeks of fake habits ending today. Clear with Settings → Reset all (export first if you care about what is there).
+- **Try with sample data:** on first visit (no habits yet), a one-time prompt offers **Try sample** (about 12 weeks of fake habits ending today) or **Skip** (opens the habit picker). After sample loads, a tip offers **Reset all** or continue. **Reset all** (Settings or tip) clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 
 ## Install (home screen)
 
@@ -139,7 +139,6 @@ js/sync.js            merge sync
 sw.js                 service worker (bump VERSION per deploy)
 manifest.webmanifest  PWA
 icons/
-images/               welcome preview asset
 ```
 
 ## Troubleshoot

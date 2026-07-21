@@ -13,6 +13,8 @@
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let welcomeOpen = false;
+  let sampleTipOpen = false;
+  let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
@@ -191,11 +193,18 @@
     state = Store.get();
     applyTheme();
     const y = window.scrollY; // keep scroll position across re-renders
-    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+    document.querySelectorAll('nav.tabs button').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === activeTab);
+      b.classList.toggle('tab-nudge', b.dataset.tab === 'settings' && shouldShowSigninNudge());
+    });
     const dot = $('#syncdot');
     dot.className = 'syncdot ' + syncDotClass();
     dot.title = syncDotTitle();
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
+    if (activeTab === 'settings' && shouldShowSigninNudge()) {
+      signinBtnNudge = true;
+      try { localStorage.setItem('sg_signin_nudge_seen', '1'); } catch (e) {}
+    }
     if (activeTab === 'today') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
     else if (activeTab === 'help') renderHelp();
@@ -203,6 +212,39 @@
     $('#fab').classList.toggle('hidden', activeTab !== 'today');
     renderModal();
     window.scrollTo(0, y);
+  }
+
+  function shouldShowSigninNudge() {
+    if (Sync.state().enabled) return false;
+    if (localStorage.getItem('sg_signin_nudge_seen')) return false;
+    if (Store.activeHabits().length < 2) return false;
+    const first = +(localStorage.getItem('sg_first_seen_at') || 0);
+    if (!first) return false;
+    return (Date.now() - first) >= 86400000;
+  }
+
+  async function doResetAll() {
+    const connected = Sync.state().enabled;
+    const msg = connected
+      ? 'Erase this browser and overwrite your Google Drive StreakGrid file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.'
+      : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
+    if (!confirm(msg)) return false;
+    Store.resetAll();
+    sampleTipOpen = false;
+    welcomeOpen = false;
+    if (connected) {
+      try { await Sync.overwriteRemoteBlank(); }
+      catch (e) { alert('Local data cleared, but Drive overwrite failed: ' + (e.message || e)); }
+    }
+    presetsOpen = true;
+    activeTab = 'today';
+    detailId = null;
+    editDraft = null;
+    calOpen = false;
+    mapPage = 0;
+    viewDate = null;
+    render();
+    return true;
   }
 
   // ---------- Today ----------
@@ -243,7 +285,7 @@
     }).join('');
 
     if (!habits.length) {
-      cards = '<div class="empty"><div class="big">🌱</div>No habits yet.<br>Tap + to add your first, or try sample data from the welcome screen.</div>';
+      cards = '<div class="empty"><div class="big">🌱</div>No habits yet.<br>Tap + to add your first.</div>';
     }
 
     $('#view').innerHTML =
@@ -429,7 +471,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
-        '<p class="mini">First visit: the welcome screen can load ~12 weeks of sample habits ending today. Clear them anytime with Settings → <b>Reset all</b> (export first if you want a backup).</p>' +
+        '<p class="mini">First visit: you can load ~12 weeks of sample habits ending today. Clear them (or any real data) with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -462,8 +504,9 @@
         '<button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disconnect">Disconnect</button></div>' +
         '<div class="mini">Your data lives in a "StreakGrid" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).</div>'
       : '<div class="set-row"><span class="grow">Store your data in your own Google Drive and sync across devices.</span>' +
-        '<button class="btn" id="connect">Sign in with Google</button></div>' +
+        '<button class="btn' + (signinBtnNudge ? ' btn-nudge' : '') + '" id="connect">Sign in with Google</button></div>' +
         (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Tracking without sign-in still works.</div>');
+    signinBtnNudge = false;
 
     let clientBlock;
     if (configured && !override && baked) {
@@ -547,7 +590,7 @@
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -611,16 +654,15 @@
       download('streakgrid-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
-    $('#reset').addEventListener('click', () => {
-      if (confirm('Erase all data in this browser? Export a backup first. (A connected Drive copy is NOT erased.)')) { Store.resetAll(); render(); }
-    });
+    $('#reset').addEventListener('click', () => { doResetAll(); });
   }
 
-  // ---------- detail + editor + preset + welcome + calendar modals ----------
+  // ---------- detail + editor + sample prompts + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
     if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
+    if (sampleTipOpen) { root.innerHTML = sampleTipHTML(); wireSampleTip(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
     if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
     if (detailId) {
@@ -699,29 +741,30 @@
     }));
   }
 
-  // ---------- first-run welcome ----------
+  // ---------- first-run sample prompt + post-sample tip ----------
   function welcomeHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
-      '<h2>Welcome to StreakGrid</h2>' +
-      '<p class="lead">GitHub-style grids for habits. Data stays in this browser (optional Drive sync later).</p>' +
-      '<img class="welcome-preview" src="images/welcome-preview.png" alt="StreakGrid Today screen with habit cards and streak grids" width="800" height="1067">' +
+      '<h2>Try sample data?</h2>' +
+      '<p class="lead">Load about 12 weeks of fake habits ending today, or skip and pick your own.</p>' +
       '<div class="btnrow">' +
-        '<button type="button" class="btn" id="welcome-start">Get started</button>' +
-        '<button type="button" class="btn ghost" id="welcome-sample">Try sample data</button>' +
+        '<button type="button" class="btn" id="welcome-sample">Try sample</button>' +
+        '<button type="button" class="btn ghost" id="welcome-skip">Skip</button>' +
       '</div>' +
-      '<p class="mini">Sample loads about 12 weeks of fake habits ending today. Clear anytime with Settings → Reset all.</p>' +
+      '<p class="mini">You can clear sample (or any) data later with Settings → Reset all.</p>' +
     '</div></div>';
   }
 
   function markWelcomeSeen() {
-    try { localStorage.setItem('sg_welcome_seen', '1'); } catch (e) {}
+    try {
+      localStorage.setItem('sg_welcome_seen', '1');
+      localStorage.setItem('sg_presets_seen', '1');
+    } catch (e) {}
   }
 
   function wireWelcome() {
-    $('#welcome-start').addEventListener('click', () => {
+    $('#welcome-skip').addEventListener('click', () => {
       markWelcomeSeen();
       welcomeOpen = false;
-      try { localStorage.setItem('sg_presets_seen', '1'); } catch (e) {}
       presetsOpen = true;
       render();
     });
@@ -733,13 +776,32 @@
         return;
       }
       markWelcomeSeen();
-      try { localStorage.setItem('sg_presets_seen', '1'); } catch (e) {}
       welcomeOpen = false;
       presetsOpen = false;
+      sampleTipOpen = true;
       activeTab = 'today';
       render();
     });
     /* Do not dismiss by tapping the dim overlay — force a choice. */
+  }
+
+  function sampleTipHTML() {
+    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
+      '<h2>Sample data loaded</h2>' +
+      '<p class="lead">Explore the grids, or start fresh with Reset all. You can always Reset later in Settings.</p>' +
+      '<div class="btnrow">' +
+        '<button type="button" class="btn danger" id="sample-reset">Reset all</button>' +
+        '<button type="button" class="btn ghost" id="sample-skip">Skip</button>' +
+      '</div>' +
+    '</div></div>';
+  }
+
+  function wireSampleTip() {
+    $('#sample-skip').addEventListener('click', () => {
+      sampleTipOpen = false;
+      render();
+    });
+    $('#sample-reset').addEventListener('click', () => { doResetAll(); });
   }
 
   // ---------- preset picker ----------
@@ -931,18 +993,27 @@
   $('#tabs').addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
+    /* Keep sample/welcome sheets open until Try/Skip/Reset — avoids flash when switching tabs. */
+    if (welcomeOpen || sampleTipOpen) return;
     activeTab = b.dataset.tab;
-    detailId = null; editDraft = null; presetsOpen = false; welcomeOpen = false; mapPage = 0; viewDate = null;
+    detailId = null; editDraft = null; presetsOpen = false; mapPage = 0; viewDate = null; calOpen = false;
     render();
   });
-  $('#fab').addEventListener('click', () => { presetsOpen = true; render(); });
+  $('#fab').addEventListener('click', () => {
+    if (welcomeOpen || sampleTipOpen) return;
+    presetsOpen = true; render();
+  });
   /* sync dot doubles as a manual sync / reconnect button */
   $('#syncdot').addEventListener('click', () => {
+    if (welcomeOpen || sampleTipOpen) return;
     if (!Sync.state().enabled) { activeTab = 'settings'; render(); return; }
     Sync.fullSync(true).catch(() => {});
   });
 
   // ---------- boot ----------
+  try {
+    if (!localStorage.getItem('sg_first_seen_at')) localStorage.setItem('sg_first_seen_at', String(Date.now()));
+  } catch (e) {}
   Store.init(() => Sync.schedulePush());
   Sync.init({
     getDoc: () => Store.get(),
@@ -954,7 +1025,7 @@
     }
   });
   render();
-  /* first run: welcome once when empty; Get started opens presets */
+  /* first run: sample prompt once when empty; Skip opens presets */
   if (!Store.activeHabits().length && !localStorage.getItem('sg_welcome_seen')) {
     welcomeOpen = true;
     render();
