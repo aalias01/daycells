@@ -2,7 +2,7 @@
  * Strategy: stale-while-revalidate for same-origin GETs. Bump VERSION to
  * force-refresh cached assets after a deploy.
  */
-const VERSION = 'sg-v23';
+const VERSION = 'sg-v24';
 const PRECACHE = [
   './',
   'index.html',
@@ -10,12 +10,14 @@ const PRECACHE = [
   'js/config.js',
   'js/logic.js',
   'js/store.js',
+  'js/sample.js',
   'js/gdrive.js',
   'js/sync.js',
   'js/app.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
-  'icons/icon-512.png'
+  'icons/icon-512.png',
+  'images/welcome-preview.png'
 ];
 
 self.addEventListener('install', e => {

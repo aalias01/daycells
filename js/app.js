@@ -12,6 +12,7 @@
   let detailId = null;   // open habit detail
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
+  let welcomeOpen = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
@@ -242,7 +243,7 @@
     }).join('');
 
     if (!habits.length) {
-      cards = '<div class="empty"><div class="big">🌱</div>No habits yet.<br>Tap + to add your first, or import a backup in Settings.</div>';
+      cards = '<div class="empty"><div class="big">🌱</div>No habits yet.<br>Tap + to add your first, or try sample data from the welcome screen.</div>';
     }
 
     $('#view').innerHTML =
@@ -421,13 +422,14 @@
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
-          '<li>Settings → <b>Appearance</b>: light/dark mode, accent (Cobalt / Ink / Teal / Fern), and whether streak grids use the accent or each habit\'s color.</li>' +
+          '<li>Settings → <b>Appearance</b>: light/dark mode, accent (Cobalt / Ink / Teal / Fern / Violet / Amber), and whether streak grids use the accent or each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (used when grids are <b>By habit</b>, and on emoji tiles / strength bars).</li>' +
           '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install StreakGrid</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
         '</ul>' +
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
+        '<p class="mini">First visit: the welcome screen can load ~12 weeks of sample habits ending today. Clear them anytime with Settings → <b>Reset all</b> (export first if you want a backup).</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -523,7 +525,9 @@
           { id: 'cobalt', label: 'Cobalt', sw: '#2f6fed' },
           { id: 'ink', label: 'Ink', sw: '#2a3344' },
           { id: 'teal', label: 'Teal', sw: '#1f8a8a' },
-          { id: 'fern', label: 'Fern', sw: '#3d9970' }
+          { id: 'fern', label: 'Fern', sw: '#3d9970' },
+          { id: 'violet', label: 'Violet', sw: '#6b5cff' },
+          { id: 'amber', label: 'Amber', sw: '#c9922a' }
         ].map(a =>
           '<button data-accent-opt="' + a.id + '" class="' + (((state.settings || {}).accent || 'cobalt') === a.id ? 'on' : '') + '">' +
             '<span class="swatch" style="background:' + a.sw + '"></span>' + a.label +
@@ -612,10 +616,11 @@
     });
   }
 
-  // ---------- detail + editor + preset + calendar modals ----------
+  // ---------- detail + editor + preset + welcome + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
+    if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
     if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
     if (detailId) {
@@ -692,6 +697,49 @@
       calOpen = false;
       render();
     }));
+  }
+
+  // ---------- first-run welcome ----------
+  function welcomeHTML() {
+    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
+      '<h2>Welcome to StreakGrid</h2>' +
+      '<p class="lead">GitHub-style grids for habits. Data stays in this browser (optional Drive sync later).</p>' +
+      '<img class="welcome-preview" src="images/welcome-preview.png" alt="StreakGrid Today screen with habit cards and streak grids" width="800" height="1067">' +
+      '<div class="btnrow">' +
+        '<button type="button" class="btn" id="welcome-start">Get started</button>' +
+        '<button type="button" class="btn ghost" id="welcome-sample">Try sample data</button>' +
+      '</div>' +
+      '<p class="mini">Sample loads about 12 weeks of fake habits ending today. Clear anytime with Settings → Reset all.</p>' +
+    '</div></div>';
+  }
+
+  function markWelcomeSeen() {
+    try { localStorage.setItem('sg_welcome_seen', '1'); } catch (e) {}
+  }
+
+  function wireWelcome() {
+    $('#welcome-start').addEventListener('click', () => {
+      markWelcomeSeen();
+      welcomeOpen = false;
+      try { localStorage.setItem('sg_presets_seen', '1'); } catch (e) {}
+      presetsOpen = true;
+      render();
+    });
+    $('#welcome-sample').addEventListener('click', () => {
+      try {
+        Store.importJSON(JSON.stringify(Sample.demoDoc()));
+      } catch (e) {
+        alert(e.message || 'Could not load sample data');
+        return;
+      }
+      markWelcomeSeen();
+      try { localStorage.setItem('sg_presets_seen', '1'); } catch (e) {}
+      welcomeOpen = false;
+      presetsOpen = false;
+      activeTab = 'today';
+      render();
+    });
+    /* Do not dismiss by tapping the dim overlay — force a choice. */
   }
 
   // ---------- preset picker ----------
@@ -884,7 +932,7 @@
     const b = ev.target.closest('button');
     if (!b) return;
     activeTab = b.dataset.tab;
-    detailId = null; editDraft = null; presetsOpen = false; mapPage = 0; viewDate = null;
+    detailId = null; editDraft = null; presetsOpen = false; welcomeOpen = false; mapPage = 0; viewDate = null;
     render();
   });
   $('#fab').addEventListener('click', () => { presetsOpen = true; render(); });
@@ -906,8 +954,11 @@
     }
   });
   render();
-  /* first run: open the preset picker instead of an empty screen */
-  if (!Store.activeHabits().length && !localStorage.getItem('sg_presets_seen')) {
+  /* first run: welcome once when empty; Get started opens presets */
+  if (!Store.activeHabits().length && !localStorage.getItem('sg_welcome_seen')) {
+    welcomeOpen = true;
+    render();
+  } else if (!Store.activeHabits().length && !localStorage.getItem('sg_presets_seen')) {
     localStorage.setItem('sg_presets_seen', '1');
     presetsOpen = true;
     render();

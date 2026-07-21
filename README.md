@@ -28,9 +28,9 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Tap a card for the 52-week map and stats. Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
-- Theme: Settings → Appearance (auto / light / dark), accent pack, streak grids Accent or By habit.
+- Theme: Settings → Appearance (auto / light / dark), accent pack (Cobalt / Ink / Teal / Fern / Violet / Amber), streak grids Accent or By habit.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
-- **Try with sample data:** Settings → Import JSON → pick [`examples/demo-import.json`](examples/demo-import.json) (about 12 weeks of fake habits). Import replaces the data in this browser; export a backup first if you care about what is there.
+- **Try with sample data:** on first visit (no habits yet), the welcome screen offers **Try sample data**: about 12 weeks of fake habits ending today. Clear with Settings → Reset all (export first if you care about what is there).
 
 ## Install (home screen)
 
@@ -133,11 +133,13 @@ scripts/inject-client-id.js  writes config from GOOGLE_CLIENT_ID
 package.json          npm run build → inject
 js/logic.js           dates, schedules, streaks, analytics
 js/store.js           browser persistence
+js/sample.js          first-run sample document (relative to today)
 js/gdrive.js          Google Identity Services + Drive
 js/sync.js            merge sync
 sw.js                 service worker (bump VERSION per deploy)
 manifest.webmanifest  PWA
 icons/
+images/               welcome preview asset
 ```
 
 ## Troubleshoot

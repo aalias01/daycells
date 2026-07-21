@@ -54,6 +54,26 @@
   --heat4: #2a6b4e;
   --paper-grid: rgba(61, 153, 112, 0.05);
 }
+:root[data-accent="violet"] {
+  --accent: #6b5cff;
+  --accent-ink: #4f42c7;
+  --accent-soft: #eceafc;
+  --heat1: #c5befa;
+  --heat2: #958af5;
+  --heat3: #6b5cff;
+  --heat4: #4638c0;
+  --paper-grid: rgba(107, 92, 255, 0.05);
+}
+:root[data-accent="amber"] {
+  --accent: #c9922a;
+  --accent-ink: #9a6e1c;
+  --accent-soft: #f7efd9;
+  --heat1: #edd9a3;
+  --heat2: #dbb45a;
+  --heat3: #c9922a;
+  --heat4: #916a18;
+  --paper-grid: rgba(201, 146, 42, 0.05);
+}
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -103,6 +123,24 @@
     --heat3: #4cae81;
     --heat4: #a8d9c0;
   }
+  :root:not([data-theme="light"])[data-accent="violet"] {
+    --accent: #9b8fff;
+    --accent-ink: #c4bdff;
+    --accent-soft: #2a2748;
+    --heat1: #3a3568;
+    --heat2: #5c52c4;
+    --heat3: #9b8fff;
+    --heat4: #d0caff;
+  }
+  :root:not([data-theme="light"])[data-accent="amber"] {
+    --accent: #e0b04a;
+    --accent-ink: #f0d48a;
+    --accent-soft: #3a3020;
+    --heat1: #4a3c20;
+    --heat2: #8a6a28;
+    --heat3: #e0b04a;
+    --heat4: #f5dfa0;
+  }
 }
 :root[data-theme="dark"] {
   --bg: #12161d;
@@ -150,6 +188,24 @@
   --heat2: #3d7a5a;
   --heat3: #4cae81;
   --heat4: #a8d9c0;
+}
+:root[data-theme="dark"][data-accent="violet"] {
+  --accent: #9b8fff;
+  --accent-ink: #c4bdff;
+  --accent-soft: #2a2748;
+  --heat1: #3a3568;
+  --heat2: #5c52c4;
+  --heat3: #9b8fff;
+  --heat4: #d0caff;
+}
+:root[data-theme="dark"][data-accent="amber"] {
+  --accent: #e0b04a;
+  --accent-ink: #f0d48a;
+  --accent-soft: #3a3020;
+  --heat1: #4a3c20;
+  --heat2: #8a6a28;
+  --heat3: #e0b04a;
+  --heat4: #f5dfa0;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -295,6 +351,14 @@ nav.tabs button.active::before {
 
 /* calendar */
 .calsheet { max-width: 400px; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+.welcomesheet { max-width: 420px; }
+.welcomesheet .welcome-preview {
+  width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line);
+  display: block; margin: 4px 0 14px; background: var(--card);
+}
+.welcomesheet h2 { margin: 0 0 6px; font-family: var(--font-display); font-size: 22px; letter-spacing: -0.03em; }
+.welcomesheet .lead { margin: 0 0 4px; font-size: 14px; color: var(--ink); line-height: 1.45; }
+.welcomesheet .mini { margin-top: 10px; }
 .calhead {
   display: grid; grid-template-columns: 40px 1fr 40px 40px;
   align-items: center; gap: 4px; margin-bottom: 14px;
