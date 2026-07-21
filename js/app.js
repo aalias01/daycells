@@ -19,7 +19,6 @@
   let analyticsMode = 'all';       // 'all' | 'focus'
   let analyticsFocusHabitId = null;
   let analyticsYear = null;        // null = current calendar year
-  let analyticsMapPage = 0;        // focus inline 52-week map paging
   let viewDate = null;   // Today tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
   let calMonth = null;   // 'YYYY-MM' while calendar is open
@@ -125,10 +124,9 @@
     return (getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2f6fed');
   }
 
-  /** Fill color for streak cells / checks: theme accent or per-habit color. */
-  function gridInk(h) {
-    const mode = ((state.settings || {}).gridColor) || 'accent';
-    return mode === 'habit' ? (h.color || accentHex()) : accentHex();
+  /** Per-habit ink for Focus heatmaps, checks, and strength bars. All-mode heat uses accentHex(). */
+  function habitInk(h) {
+    return (h && h.color) || accentHex();
   }
 
   function scheduleLabel(h) {
@@ -160,7 +158,9 @@
   function streakHeatChipHTML(h, streak, habitId) {
     const tier = streakHeatTier(h, streak);
     if (tier === 'none') return '';
-    const label = tier === 'hot' ? 'Hot' : 'Mild';
+    const label = Logic.isPerWeek(h)
+      ? (tier === 'hot' ? '4w+' : '2w+')
+      : (tier === 'hot' ? '7d+' : '3d+');
     return '<span class="streakchip ' + tier + '" data-streak-chip="' + esc(habitId || h.id) + '">' + label + '</span>';
   }
 
@@ -195,7 +195,7 @@
     });
   }
 
-  function yearHeatCellHTML(c, ink, mode) {
+  function yearHeatCellHTML(c, ink, mode, editable) {
     if (c.outside) return '<span class="c outside"></span>';
     let style = '';
     if (mode === 'combined') {
@@ -208,10 +208,13 @@
       if (c.done) style = 'background:' + esc(ink);
       else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
     }
-    return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '" style="' + style + '"></span>';
+    const canEdit = editable && !c.future && !c.outside;
+    return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '"' +
+      (canEdit ? ' data-cell="' + c.iso + '"' : '') +
+      ' style="' + style + '"></span>';
   }
 
-  function yearHeatHTML(cols, ink, mode) {
+  function yearHeatHTML(cols, ink, mode, editable) {
     const months = yearMonthLabels(cols);
     const monthRow = '<div class="yearheatmap-months">' + months.map(m =>
       '<span class="monthcol"><span class="monthlbl">' + esc(m) + '</span></span>'
@@ -221,7 +224,7 @@
       '<span class="dowlbl">' + d + '</span>'
     ).join('') + '</div>';
     const grid = '<div class="gridfull yeargrid">' + cols.map(col =>
-      '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode)).join('') + '</div>'
+      '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode, editable)).join('') + '</div>'
     ).join('') + '</div>';
     return '<div class="yearheatmap-wrap"><div class="yearheatmap-scroll">' +
       '<div class="yearheatmap-inner">' + monthRow +
@@ -305,20 +308,8 @@
   }
 
   // ---------- streakmap builders ----------
-  function miniMap(h, weeks) {
-    const ink = gridInk(h);
-    const cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, Logic.todayISO());
-    return '<div class="gridmini">' + cols.map(col =>
-      '<div class="col">' + col.map(c => {
-        let style = '';
-        if (c.done) style = 'background:' + esc(ink);
-        else if (c.skip && !c.future) style = 'background:' + hexToRgba(ink, .18);
-        return '<span class="c' + (c.future ? ' future' : '') + '" style="' + style + '"></span>';
-      }).join('') + '</div>').join('') + '</div>';
-  }
-
   function fullMap(h, weeks, endISO) {
-    const ink = gridInk(h);
+    const ink = habitInk(h);
     const upto = endISO || Logic.todayISO();
     let cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, upto);
     /* Drop leading empty weeks before the habit's first activity so short histories
@@ -473,13 +464,14 @@
       const done = Logic.isDone(state.cells, iso, h.id);
       const req = Logic.isRequired(h, iso, state.skips);
       const streak = Logic.currentStreak(h, state.cells, state.skips, today);
-      const ink = gridInk(h);
+      const ink = habitInk(h);
       const perWeekNote = Logic.isPerWeek(h)
         ? ' · ' + Logic.weekDoneCount(h, state.cells, Logic.weekStartOf(iso), iso) + '/' + Logic.weekTarget(h) + ' this wk' : '';
+      const chip = streakHeatChipHTML(h, streak, h.id);
       return '<div class="hcard compact">' +
         '<div class="top">' +
           '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
-          '<span class="nm"><div class="name">' + esc(h.name) + '</div>' +
+          '<span class="nm"><div class="name">' + esc(h.name) + ' ' + chip + '</div>' +
             '<div class="meta">' + esc(scheduleLabel(h)) + perWeekNote + ' · ' + streak + Logic.streakUnit(h) + '</div></span>' +
           '<button class="check' + (done ? ' done' : '') + (!req && !done ? ' optional' : '') + '" data-toggle="' + h.id + '"' +
             ' aria-label="' + esc(h.name) + (done ? ': done, tap to undo' : ': mark done') + '" aria-pressed="' + done + '"' +
@@ -538,6 +530,7 @@
     const jt = $('#jumptoday');
     if (jt) jt.addEventListener('click', () => { viewDate = null; render(); });
     wireInstallCard();
+    checkStreakCelebrations(habits);
   }
 
   // ---------- Analytics ----------
@@ -584,26 +577,12 @@
   }
 
   function renderAnalyticsFocusPanels(h, today, year) {
-    const ink = gridInk(h);
     const dow = Logic.dowShareBreakdown(h, state.cells);
     const dowMax = Math.max.apply(null, dow.concat([.01]));
     const months = Logic.monthlyCounts(h, state.cells, 6, today);
     const moMax = Math.max.apply(null, months.map(m => m.count).concat([1]));
-    const endISO = Logic.addDays(today, -364 * analyticsMapPage);
-    const startISO = Logic.addDays(Logic.weekStartOf(endISO), -7 * 51);
-    const first = Logic.habitStartDate(h, state.cells);
-    const olderExists = first && first < startISO;
-    const rangeLbl = analyticsMapPage === 0 ? 'last 52 weeks'
-      : startISO.slice(0, 10) + ' to ' + endISO.slice(0, 10);
-    return '<div class="card"><h2>Streakmap · ' + rangeLbl + ' · tap to edit any day</h2>' +
-      fullMap(h, 52, endISO) +
-      '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span>Full color = done · faint = rest day</span>' +
-        '<span><button type="button" class="pagebtn" id="anamapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
-        '<button type="button" class="pagebtn" id="anamapnewer"' + (analyticsMapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
-      '</div></div>' +
-      '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
-        '<div class="b"><b>' + Math.round(n * 100) + '%</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>' +
+    return '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
+      '<div class="b"><b>' + Math.round(n * 100) + '%</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>' +
       '<div class="mini">Share of completions on each weekday (not raw counts).</div></div>' +
       '<div class="card"><h2>Last 6 months</h2><div class="bars">' + months.map(m =>
         '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>';
@@ -629,13 +608,11 @@
       if (analyticsMode === 'focus' && !analyticsFocusHabitId && habits.length) {
         analyticsFocusHabitId = habits[0].id;
       }
-      analyticsMapPage = 0;
       render();
     }));
     document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
       analyticsMode = 'focus';
       analyticsFocusHabitId = b.dataset.focusHabit;
-      analyticsMapPage = 0;
       render();
     }));
     document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
@@ -644,19 +621,14 @@
     }));
     const edit = $('#inlineedit');
     if (edit) edit.addEventListener('click', () => openEditor(analyticsFocusHabitId));
-    const older = $('#anamapolder'), newer = $('#anamapnewer');
-    if (older) older.addEventListener('click', () => { analyticsMapPage++; render(); });
-    if (newer) newer.addEventListener('click', () => { analyticsMapPage = Math.max(0, analyticsMapPage - 1); render(); });
     const focusH = habits.find(h => h.id === analyticsFocusHabitId);
-    if (focusH) {
+    if (focusH && analyticsMode === 'focus') {
       document.querySelectorAll('#view [data-cell]').forEach(c => c.addEventListener('click', () => {
         if (c.dataset.cell > Logic.todayISO()) return;
         Store.toggleCell(c.dataset.cell, focusH.id);
         render();
       }));
     }
-    const gf = document.querySelector('#view .gridfull:not(.yeargrid)');
-    if (gf) gf.scrollLeft = gf.scrollWidth;
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
@@ -696,12 +668,12 @@
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, gridInk(h), 'habit');
+      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', true);
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest day';
+      heatLegendNote = 'Full color = done · faint = rest day · tap a day to edit';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, accent, 'combined');
+      yearHeat = yearHeatHTML(cols, accent, 'combined', false);
       heatTitle = 'All habits · ' + year;
       heatLegendNote = 'Cell shade = share of scheduled habits completed that day';
     }
@@ -771,19 +743,19 @@
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
           '<li>On <b>Today</b>, tap the <b>checkmark</b> to log it. Cards are compact check rows only.</li>' +
-          '<li><b>Analytics</b> has an <b>All</b> portfolio view and a <b>Focus one</b> mode for a single habit\'s streakmap, stats, and calendar-year heat.</li>' +
+          '<li><b>Analytics</b> has an <b>All</b> portfolio view and a <b>Focus one</b> mode for a single habit\'s year heat (tap a day to edit), stats, and trends.</li>' +
           '<li>Forgot a day? Tap the date for a calendar, or use the arrows. Future days are blocked.</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional: add a one-line <b>note</b> under Today for that day.</li>' +
         '</ul>' +
-        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory). <b>Mild/Hot</b> chips flag streak momentum in Analytics.</p>' +
+        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory). Streak milestone chips (<b>3d+</b> / <b>7d+</b>, or <b>2w+</b> / <b>4w+</b> for weekly habits) appear on Today and Analytics.</p>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
-          '<li>Settings → <b>Appearance</b>: light/dark mode, accent (Cobalt / Ink / Teal / Fern / Violet / Amber), and whether streak grids use the accent or each habit\'s color.</li>' +
-          '<li>Edit a habit to change its color (used when grids are <b>By habit</b>, and on emoji tiles / strength bars).</li>' +
+          '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one uses each habit\'s color.</li>' +
+          '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
           '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install StreakGrid</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
         '</ul>' +
       '</div>' +
@@ -894,14 +866,7 @@
             '<span class="swatch" style="background:' + a.sw + '"></span><span class="alabel">' + a.label + '</span>' +
           '</button>').join('') +
         '</span></div>' +
-        '<div class="set-row"><span class="grow">Streak grids</span><span class="seg" id="gridseg">' +
-        [
-          { id: 'accent', label: 'Accent' },
-          { id: 'habit', label: 'By habit' }
-        ].map(g =>
-          '<button data-grid-opt="' + g.id + '" class="' + (((state.settings || {}).gridColor || 'accent') === g.id ? 'on' : '') + '">' + g.label + '</button>').join('') +
-        '</span></div>' +
-        '<div class="mini">Accent paints chrome and unified grids. <b>By habit</b> uses each habit\'s color (edit a habit to change it). Analytics overview always uses Accent.</div>' +
+        '<div class="mini">Accent paints chrome and the All-habits year heatmap. Focus one uses each habit\'s color (edit a habit to change it).</div>' +
       '</div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
         '<button class="btn" id="exportjson">Export JSON</button>' +
@@ -944,9 +909,6 @@
     }));
     document.querySelectorAll('[data-accent-opt]').forEach(b => b.addEventListener('click', () => {
       Store.setSetting('accent', b.dataset.accentOpt); render();
-    }));
-    document.querySelectorAll('[data-grid-opt]').forEach(b => b.addEventListener('click', () => {
-      Store.setSetting('gridColor', b.dataset.gridOpt); render();
     }));
     document.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', () => { Store.moveHabit(b.dataset.id, +b.dataset.mv); render(); }));
     document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));

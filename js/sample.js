@@ -73,7 +73,7 @@ const Sample = (() => {
       cells: cells,
       skips: skips,
       notes: {},
-      settings: { weekStart: 1, theme: 'auto', accent: 'cobalt', gridColor: 'accent' },
+      settings: { weekStart: 1, theme: 'auto', accent: 'cobalt' },
       settingsUpdatedAt: t
     };
   }

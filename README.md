@@ -29,7 +29,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
-- Theme: Settings → Appearance (auto / light / dark), accent pack (Cobalt / Ink / Teal / Fern / Violet / Amber), streak grids Accent or By habit.
+- Theme: Settings → Appearance (auto / light / dark) and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits year heat uses the accent; Focus one uses each habit's color.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
 - **Try with sample data:** on first visit (no habits yet), a one-time prompt offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (demo habits; replaces this browser’s data after confirm). After a first-visit sample load, a tip offers **Reset all** or continue. **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 
