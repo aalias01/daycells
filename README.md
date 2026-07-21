@@ -44,13 +44,13 @@ Daycells is a progressive web app (PWA): after you add it to the home screen, it
 
 | Platform | What to do |
 |----------|------------|
-| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install Daycells** when the button appears. Or browser menu → Install app. |
+| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install Daycells** when the button appears. Or browser menu → Install app. Prefer Chrome/Edge over Brave: Brave home-screen shortcuts often keep a browser badge and a weaker favicon. |
 | **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. In Safari: Share → **Add to Home Screen** → Add. Settings → **Home screen** shows the same steps. |
 | **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
 
 Already installed (opened from the home-screen icon): Settings shows that you are running as an installed app.
 
-After a deploy, hard-refresh or reopen the installed app so `sw.js` picks up the new `VERSION`.
+After a deploy, hard-refresh or reopen the installed app so `sw.js` picks up the new `VERSION`. To refresh a phone home-screen icon, remove the old shortcut and install again (the OS often caches the old icon).
 
 ## Google Drive setup (full reference)
 
