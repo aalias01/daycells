@@ -249,10 +249,10 @@
         const sc = c.score;
         const a = sc >= 1 ? 1 : sc >= .75 ? .75 : sc >= .5 ? .5 : sc > 0 ? .28 : 0;
         if (a) style = 'background:' + hexToRgba(ink, a);
-      } else if (c.skip) style = 'opacity:.45';
+      } else if (c.skip) style = 'opacity:.55';
     } else {
       if (c.done) style = 'background:' + esc(ink);
-      else if ((c.skip || c.off) && !c.future) style = 'background:' + hexToRgba(ink, .18);
+      else if ((c.skip || c.off) && !c.future) style = 'background:' + hexToRgba(ink, .36);
     }
     const canEdit = editable && !c.future && !c.outside;
     return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '"' +
@@ -265,17 +265,22 @@
     const monthRow = '<div class="yearheatmap-months">' + months.map(m =>
       '<span class="monthcol"><span class="monthlbl">' + esc(m) + '</span></span>'
     ).join('') + '</div>';
+    /* Sparse Mon/Wed/Fri labels (GitHub-style); Mon-first rows. Kept outside the
+       horizontal scroller so they stay visible when the grid centers on today. */
     const dowLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
-    const dowCol = '<div class="yearheatmap-dows">' + dowLabels.map(d =>
-      '<span class="dowlbl">' + d + '</span>'
+    const dowCol = '<div class="yearheatmap-dows" aria-hidden="true">' + dowLabels.map(d =>
+      '<span class="dowlbl">' + (d ? esc(d) : '') + '</span>'
     ).join('') + '</div>';
     const grid = '<div class="gridfull yeargrid">' + cols.map(col =>
       '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode, editable)).join('') + '</div>'
     ).join('') + '</div>';
-    return '<div class="yearheatmap-wrap"><div class="yearheatmap-scroll">' +
-      '<div class="yearheatmap-inner">' + monthRow +
-      '<div class="yearheatmap-body">' + dowCol + grid + '</div>' +
-      '</div></div></div>';
+    return '<div class="yearheatmap-wrap">' +
+      '<div class="yearheatmap-body">' +
+        dowCol +
+        '<div class="yearheatmap-scroll">' +
+          '<div class="yearheatmap-inner">' + monthRow + grid + '</div>' +
+        '</div>' +
+      '</div></div>';
   }
 
   function yearPickerHTML(years, selectedYear) {
@@ -374,8 +379,8 @@
         let style = '';
         const future = c.iso > today;
         if (c.done) style = 'background:' + esc(ink);
-        else if (c.skip && !future) style = 'background:' + hexToRgba(ink, .18);
-        else if (!Logic.isPerWeek(h) && !Logic.isScheduled(h, c.iso) && !future) style = 'background:' + hexToRgba(ink, .18);
+        else if (c.skip && !future) style = 'background:' + hexToRgba(ink, .36);
+        else if (!Logic.isPerWeek(h) && !Logic.isScheduled(h, c.iso) && !future) style = 'background:' + hexToRgba(ink, .36);
         return '<span class="c' + (future ? ' future' : '') + (c.iso === today ? ' today' : '') + '" data-cell="' + c.iso + '" style="' + style + '"></span>';
       }).join('') + '</div>').join('') + '</div>';
   }
