@@ -222,6 +222,7 @@ body {
   font-feature-settings: "tnum" 1;
 }
 .shell { max-width: 640px; margin: 0 auto; min-height: 100dvh; padding: 0 14px calc(76px + env(safe-area-inset-bottom)); }
+main#view.tab-animating { will-change: transform, opacity; pointer-events: none; }
 
 /* instrument header */
 header.app {

@@ -949,14 +949,14 @@
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
       heatLegendNote = heatJumpDirect()
         ? 'Full color = done · faint = rest or off day · click a day to open in Habits'
-        : 'Full color = done · faint = rest or off day · scroll to explore · pick a day from Habits';
+        : 'Full color = done · faint = rest or off day · scroll to explore';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: heatJumpDirect() });
       heatTitle = 'All habits · ' + year;
       heatLegendNote = heatJumpDirect()
         ? 'Cell shade = share of scheduled habits completed that day · click a day to open in Habits'
-        : 'Cell shade = share of scheduled habits completed that day · scroll to explore · pick a day from Habits';
+        : 'Cell shade = share of scheduled habits completed that day · scroll to explore';
     }
 
     const overview = analyticsMode === 'focus'
@@ -1694,6 +1694,7 @@
   });
 
   const TAB_ORDER = ['habits', 'analytics', 'settings', 'help'];
+  let tabSlideBusy = false;
 
   function switchTab(tab, allowSame) {
     if (!tab || welcomeOpen) return;
@@ -1704,6 +1705,51 @@
     hideHeatDaySheet();
     render();
     window.scrollTo(0, 0);
+  }
+
+  function preferReducedMotion() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (e) { return false; }
+  }
+
+  function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /** Swipe tab change: slide page out, swap, slide in. Tab clicks stay instant via switchTab. */
+  async function switchTabSlide(tab, dir) {
+    if (!tab || welcomeOpen || tab === activeTab || tabSlideBusy) return;
+    if (preferReducedMotion()) { switchTab(tab); return; }
+    const view = $('#view');
+    if (!view) { switchTab(tab); return; }
+
+    tabSlideBusy = true;
+    const ms = 280;
+    const exitX = dir > 0 ? '-30%' : '30%';
+    const enterX = dir > 0 ? '30%' : '-30%';
+
+    view.classList.add('tab-animating');
+    view.style.transition = 'transform ' + ms + 'ms ease, opacity ' + ms + 'ms ease';
+    view.style.transform = 'translateX(' + exitX + ')';
+    view.style.opacity = '0';
+    await waitMs(ms);
+
+    switchTab(tab);
+
+    view.style.transition = 'none';
+    view.style.transform = 'translateX(' + enterX + ')';
+    view.style.opacity = '0';
+    void view.offsetWidth;
+    view.style.transition = 'transform ' + ms + 'ms ease, opacity ' + ms + 'ms ease';
+    view.style.transform = 'translateX(0)';
+    view.style.opacity = '1';
+    await waitMs(ms);
+
+    view.classList.remove('tab-animating');
+    view.style.transition = '';
+    view.style.transform = '';
+    view.style.opacity = '';
+    tabSlideBusy = false;
   }
 
   /** Phone: swipe left/right on main content to change tabs (skips heatmap scroll & sheets). */
@@ -1718,7 +1764,7 @@
     }
 
     main.addEventListener('touchstart', ev => {
-      if (ev.touches.length !== 1 || sheetOpen()) { tracking = false; return; }
+      if (tabSlideBusy || ev.touches.length !== 1 || sheetOpen()) { tracking = false; return; }
       const t = ev.target;
       if (t.closest && t.closest('.yearheatmap-scroll, .drag-handle, input, textarea, select')) {
         tracking = false;
@@ -1732,7 +1778,7 @@
     main.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
 
     main.addEventListener('touchend', ev => {
-      if (!tracking) return;
+      if (!tracking || tabSlideBusy) return;
       tracking = false;
       if (sheetOpen()) return;
       const t = ev.changedTouches[0];
@@ -1741,8 +1787,8 @@
       if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
       const i = TAB_ORDER.indexOf(activeTab);
       if (i < 0) return;
-      if (dx < 0 && i < TAB_ORDER.length - 1) switchTab(TAB_ORDER[i + 1]);
-      else if (dx > 0 && i > 0) switchTab(TAB_ORDER[i - 1]);
+      if (dx < 0 && i < TAB_ORDER.length - 1) switchTabSlide(TAB_ORDER[i + 1], 1);
+      else if (dx > 0 && i > 0) switchTabSlide(TAB_ORDER[i - 1], -1);
     }, { passive: true });
   }
   wireTabSwipe();
