@@ -450,8 +450,23 @@ button.calcell:active { transform: scale(.96); }
   pointer-events: none;
 }
 .calcell.today { border-color: var(--accent); color: var(--accent-ink); font-weight: 700; opacity: 1; }
-.calcell.selected { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; opacity: 1; }
+.calcell.heat-none { background: var(--card); }
+.calcell.heat-0 { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.calcell.heat-1 { background: color-mix(in srgb, var(--accent) 22%, var(--card)); }
+.calcell.heat-2 { background: color-mix(in srgb, var(--accent) 38%, var(--card)); }
+.calcell.heat-3 { background: color-mix(in srgb, var(--accent) 55%, var(--card)); }
+.calcell.heat-4 { background: color-mix(in srgb, var(--accent) 72%, var(--card)); color: #fff; }
+.calcell.heat-rest {
+  background: var(--bg);
+  border-style: dashed;
+  color: var(--muted);
+}
+.calcell.selected {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; opacity: 1;
+  border-style: solid;
+}
 .calcell.selected.today { box-shadow: 0 0 0 2px var(--accent-soft); }
+.callegend { margin-top: 10px; text-align: center; }
 .calfoot { margin-top: 12px; justify-content: center; }
 
 .dhead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -482,23 +497,6 @@ button.calcell:active { transform: scale(.96); }
   font-size: 12px; line-height: 1.4; font-family: var(--font-mono); pointer-events: none;
 }
 .heat-tip[hidden] { display: none; }
-.heat-day-sheet { max-width: 420px; }
-.heat-day-sheet .heat-day-body {
-  margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: var(--ink);
-  font-family: var(--font-mono);
-}
-.heat-day-nav { margin-bottom: 8px; }
-.heat-day-nav .btn {
-  flex: 1;
-  min-height: 44px;
-  padding: 12px 14px;
-}
-.heat-day-nav .btn:disabled { opacity: .35; }
-.yearheatmap-inner .c.jump.heat-day-active {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  z-index: 1;
-}
 .maplegend { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--font-mono); }
 .maplegend .heatswatch {
   display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 1px;

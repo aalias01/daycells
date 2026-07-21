@@ -835,6 +835,7 @@
     const edit = $('#inlineedit');
     if (edit) edit.addEventListener('click', () => openEditor(analyticsFocusHabitId));
     document.querySelectorAll('#view [data-jump-day]').forEach(c => {
+      if (!heatJumpDirect()) return; /* phone: heatmap is glance-only */
       const go = () => {
         const iso = c.dataset.jumpDay;
         const today = Logic.todayISO();
@@ -846,19 +847,13 @@
         render();
         window.scrollTo(0, 0);
       };
-      c.addEventListener('click', () => {
-        /* Laptop: jump immediately. Phone: confirm sheet (avoids accidental navigation). */
-        if (heatJumpDirect()) go();
-        else showHeatDaySheet(c);
-      });
+      c.addEventListener('click', go);
       c.addEventListener('keydown', ev => {
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
       });
-      if (heatJumpDirect()) {
-        c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
-        c.addEventListener('pointermove', ev => moveHeatTip(ev));
-        c.addEventListener('pointerleave', () => hideHeatTip());
-      }
+      c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
+      c.addEventListener('pointermove', ev => moveHeatTip(ev));
+      c.addEventListener('pointerleave', () => hideHeatTip());
     });
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
@@ -908,87 +903,6 @@
     if (tip) tip.hidden = true;
   }
 
-  function showHeatDaySheet(startEl) {
-    hideHeatTip();
-    hideHeatDaySheet();
-    let iso = startEl.dataset.jumpDay;
-    if (!iso) return;
-    const today = Logic.todayISO();
-
-    const ovl = document.createElement('div');
-    ovl.id = 'heat-day-ovl';
-    ovl.className = 'overlay';
-    ovl.innerHTML =
-      '<div class="sheet heat-day-sheet" role="dialog" aria-label="Day details">' +
-        '<div class="grab"></div>' +
-        '<p class="heat-day-body" id="heat-day-body"></p>' +
-        '<div class="btnrow heat-day-nav">' +
-          '<button type="button" class="btn ghost" id="heat-day-prev" aria-label="Previous day">← Previous</button>' +
-          '<button type="button" class="btn ghost" id="heat-day-next" aria-label="Next day">Next →</button>' +
-        '</div>' +
-        '<div class="btnrow">' +
-          '<button type="button" class="btn" id="heat-day-open">Open in Habits</button>' +
-          '<button type="button" class="btn ghost" id="heat-day-close">Close</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(ovl);
-
-    const bodyEl = ovl.querySelector('#heat-day-body');
-    const prevBtn = ovl.querySelector('#heat-day-prev');
-    const nextBtn = ovl.querySelector('#heat-day-next');
-
-    function cellFor(day) {
-      return document.querySelector('#view [data-jump-day="' + day + '"]');
-    }
-
-    function setActiveCell() {
-      document.querySelectorAll('#view [data-jump-day].heat-day-active').forEach(el => {
-        el.classList.remove('heat-day-active');
-      });
-      const cell = cellFor(iso);
-      if (cell) cell.classList.add('heat-day-active');
-    }
-
-    function refresh() {
-      const cell = cellFor(iso);
-      const tip = cell ? (cell.getAttribute('data-tip') || '') : '';
-      const body = tip.replace(/ · Open in Habits$/, '') || iso;
-      bodyEl.textContent = body;
-      const prevIso = Logic.addDays(iso, -1);
-      const nextIso = Logic.addDays(iso, 1);
-      prevBtn.disabled = !cellFor(prevIso);
-      nextBtn.disabled = iso >= today || !cellFor(nextIso);
-      setActiveCell();
-    }
-
-    function openHabits() {
-      if (!iso || iso > today) return;
-      activeTab = 'habits';
-      viewDate = iso >= today ? null : iso;
-      hideHeatDaySheet();
-      render();
-      window.scrollTo(0, 0);
-    }
-
-    const close = () => hideHeatDaySheet();
-    ovl.addEventListener('click', ev => { if (ev.target.id === 'heat-day-ovl') close(); });
-    ovl.querySelector('#heat-day-close').addEventListener('click', close);
-    ovl.querySelector('#heat-day-open').addEventListener('click', openHabits);
-    prevBtn.addEventListener('click', () => {
-      const prevIso = Logic.addDays(iso, -1);
-      if (!cellFor(prevIso)) return;
-      iso = prevIso;
-      refresh();
-    });
-    nextBtn.addEventListener('click', () => {
-      const nextIso = Logic.addDays(iso, 1);
-      if (nextIso > today || !cellFor(nextIso)) return;
-      iso = nextIso;
-      refresh();
-    });
-    refresh();
-  }
-
   function hideHeatDaySheet() {
     document.querySelectorAll('#view [data-jump-day].heat-day-active').forEach(el => {
       el.classList.remove('heat-day-active');
@@ -1031,14 +945,18 @@
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: true });
+      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: heatJumpDirect() });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day for details (Previous / Next in the popup on phone)';
+      heatLegendNote = heatJumpDirect()
+        ? 'Full color = done · faint = rest or off day · click a day to open in Habits'
+        : 'Full color = done · faint = rest or off day · scroll to explore · pick a day from Habits';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: true });
+      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: heatJumpDirect() });
       heatTitle = 'All habits · ' + year;
-      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day for details (Previous / Next in the popup on phone)';
+      heatLegendNote = heatJumpDirect()
+        ? 'Cell shade = share of scheduled habits completed that day · click a day to open in Habits'
+        : 'Cell shade = share of scheduled habits completed that day · scroll to explore · pick a day from Habits';
     }
 
     const overview = analyticsMode === 'focus'
@@ -1412,6 +1330,7 @@
     const monthLabel = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     const thisYm = today.slice(0, 7);
     const canNext = ym < thisYm;
+    const habits = Store.activeHabits();
 
     let cells = '';
     for (let d = 1; d <= daysInMonth; d++) {
@@ -1419,7 +1338,20 @@
       const future = iso > today;
       const isSel = iso === selected;
       const isTod = iso === today;
-      const cls = 'calcell' + (future ? ' future' : '') + (isSel ? ' selected' : '') + (isTod ? ' today' : '');
+      let heat = '';
+      if (!future) {
+        if (Logic.isSkip(state.skips, iso)) heat = ' heat-rest';
+        else {
+          const score = Logic.dayScore(habits, state.cells, state.skips, iso);
+          if (score === null) heat = ' heat-none';
+          else if (score >= 1) heat = ' heat-4';
+          else if (score >= 0.75) heat = ' heat-3';
+          else if (score >= 0.5) heat = ' heat-2';
+          else if (score > 0) heat = ' heat-1';
+          else heat = ' heat-0';
+        }
+      }
+      const cls = 'calcell' + heat + (future ? ' future' : '') + (isSel ? ' selected' : '') + (isTod ? ' today' : '');
       /* Skip empty placeholder cells (they inflated the first row). Offset day 1 instead. */
       const col = (d === 1 && startDow > 0) ? ' style="grid-column-start:' + (startDow + 1) + '"' : '';
       cells += future
@@ -1436,6 +1368,7 @@
       '</div>' +
       '<div class="caldows">' + DOWS.map(d => '<span>' + d + '</span>').join('') + '</div>' +
       '<div class="calgrid">' + cells + '</div>' +
+      '<div class="mini callegend">Shade = share of scheduled habits done that day · dashed = rest</div>' +
       '<div class="btnrow calfoot"><button class="btn ghost" id="caltoday">Jump to today</button></div>' +
     '</div></div>';
   }
@@ -1757,10 +1690,62 @@
     if (!b) return;
     /* Keep welcome sheet open until Try/Skip — avoids flash when switching tabs. */
     if (welcomeOpen) return;
-    activeTab = b.dataset.tab;
-    detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
-    render();
+    switchTab(b.dataset.tab, true);
   });
+
+  const TAB_ORDER = ['habits', 'analytics', 'settings', 'help'];
+
+  function switchTab(tab, allowSame) {
+    if (!tab || welcomeOpen) return;
+    if (!allowSame && tab === activeTab) return;
+    activeTab = tab;
+    detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
+    hideHeatTip();
+    hideHeatDaySheet();
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  /** Phone: swipe left/right on main content to change tabs (skips heatmap scroll & sheets). */
+  function wireTabSwipe() {
+    const main = $('#view');
+    if (!main) return;
+    let startX = 0, startY = 0, tracking = false;
+
+    function sheetOpen() {
+      return !!(document.querySelector('.overlay') || document.getElementById('heat-day-ovl') ||
+        welcomeOpen || presetsOpen || notesOpen || calOpen || editDraft || detailId);
+    }
+
+    main.addEventListener('touchstart', ev => {
+      if (ev.touches.length !== 1 || sheetOpen()) { tracking = false; return; }
+      const t = ev.target;
+      if (t.closest && t.closest('.yearheatmap-scroll, .drag-handle, input, textarea, select')) {
+        tracking = false;
+        return;
+      }
+      tracking = true;
+      startX = ev.touches[0].clientX;
+      startY = ev.touches[0].clientY;
+    }, { passive: true });
+
+    main.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+
+    main.addEventListener('touchend', ev => {
+      if (!tracking) return;
+      tracking = false;
+      if (sheetOpen()) return;
+      const t = ev.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+      const i = TAB_ORDER.indexOf(activeTab);
+      if (i < 0) return;
+      if (dx < 0 && i < TAB_ORDER.length - 1) switchTab(TAB_ORDER[i + 1]);
+      else if (dx > 0 && i > 0) switchTab(TAB_ORDER[i - 1]);
+    }, { passive: true });
+  }
+  wireTabSwipe();
   $('#fab').addEventListener('click', () => {
     if (welcomeOpen) return;
     presetsOpen = true; render();
