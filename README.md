@@ -3,11 +3,15 @@
 Habit tracker with a GitHub-style contribution grid per habit. Static site. No backend. Your data stays in your browser, and optionally in a JSON file in your own Google Drive.
 
 **Live app:** [https://daycells.vercel.app](https://daycells.vercel.app)  
-**Source:** [github.com/aalias01/daycells](https://github.com/aalias01/daycells) (MIT)
+**Source:** [github.com/aalias01/daycells](https://github.com/aalias01/daycells) ([MIT](#license))
 
 Open the live URL, tap +, start checking habits. On the live deploy, a Google OAuth Client ID is already set (via Vercel env at build time). If your Gmail is on the project’s test-user list, open Help or Settings and tap **Sign in with Google**. No paste needed.
 
 Forks and your own deploys: leave committed `js/config.js` empty. Create your own Client ID (steps below), then either set `GOOGLE_CLIENT_ID` on your host’s build env or paste it under Settings → Advanced.
+
+## License
+
+Daycells is licensed under the [MIT License](LICENSE) (Copyright 2026 Alvin Alias). Keep the `LICENSE` file when you fork or redistribute. A “Based on [Daycells](https://github.com/aalias01/daycells)” credit in your README is appreciated but not required. Please don’t present a fork as the official [daycells.vercel.app](https://daycells.vercel.app) app.
 
 ## Data
 
