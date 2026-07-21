@@ -30,6 +30,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - Theme: Settings → Appearance (auto / light / dark), accent pack, streak grids Accent or By habit.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
+- **Try with sample data:** Settings → Import JSON → pick [`examples/demo-import.json`](examples/demo-import.json) (about 12 weeks of fake habits). Import replaces the data in this browser; export a backup first if you care about what is there.
 
 ## Install (home screen)
 
@@ -37,7 +38,7 @@ StreakGrid is a progressive web app (PWA): after you add it to the home screen, 
 
 | Platform | What to do |
 |----------|------------|
-| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. On Today, an Install chip may show when the browser is ready (Hide remembers via Settings; install stays under Home screen). |
+| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. |
 | **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. Settings → **Home screen** → **How to add**: Share → **Add to Home Screen** → Add. |
 | **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
 
