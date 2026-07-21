@@ -241,7 +241,8 @@
     });
   }
 
-  function yearHeatCellHTML(c, ink, mode, editable) {
+  function yearHeatCellHTML(c, ink, mode, opts) {
+    opts = opts || {};
     if (c.outside) return '<span class="c outside"></span>';
     let style = '';
     if (mode === 'combined') {
@@ -254,13 +255,33 @@
       if (c.done) style = 'background:' + esc(ink);
       else if ((c.skip || c.off) && !c.future) style = 'background:' + hexToRgba(ink, .36);
     }
-    const canEdit = editable && !c.future && !c.outside;
-    return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + '"' +
-      (canEdit ? ' data-cell="' + c.iso + '"' : '') +
+    const openable = !!opts.openInToday && !c.future && !c.outside;
+    let tip = '';
+    if (!c.future && !c.outside) {
+      const nice = Logic.parseDate(c.iso).toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+      });
+      let status;
+      if (mode === 'combined') {
+        if (c.skip) status = 'Rest day';
+        else if (c.score === null) status = 'Nothing scheduled';
+        else status = Math.round(c.score * 100) + '% of scheduled habits';
+      } else if (c.done) status = 'Done';
+      else if (c.skip) status = 'Rest day';
+      else if (c.off) status = 'Off schedule';
+      else status = 'Not done';
+      const note = (Store.getNote(c.iso) || '').trim();
+      const noteBit = note ? (note.length > 80 ? note.slice(0, 77) + '…' : note) : '';
+      tip = nice + ' · ' + status + (noteBit ? ' · ' + noteBit : '') + (openable ? ' · Open in Today' : '');
+    }
+    return '<span class="c' + (c.future ? ' future' : '') + (c.today ? ' today' : '') + (openable ? ' jump' : '') + '"' +
+      (openable ? ' data-jump-day="' + c.iso + '" role="button" tabindex="0"' : '') +
+      (tip ? ' title="' + esc(tip) + '" data-tip="' + esc(tip) + '"' : '') +
       ' style="' + style + '"></span>';
   }
 
-  function yearHeatHTML(cols, ink, mode, editable) {
+  function yearHeatHTML(cols, ink, mode, opts) {
+    opts = opts || {};
     const months = yearMonthLabels(cols);
     const monthRow = '<div class="yearheatmap-months">' + months.map(m =>
       '<span class="monthcol"><span class="monthlbl">' + esc(m) + '</span></span>'
@@ -272,7 +293,7 @@
       '<span class="dowlbl">' + (d ? esc(d) : '') + '</span>'
     ).join('') + '</div>';
     const grid = '<div class="gridfull yeargrid">' + cols.map(col =>
-      '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode, editable)).join('') + '</div>'
+      '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode, opts)).join('') + '</div>'
     ).join('') + '</div>';
     return '<div class="yearheatmap-wrap">' +
       '<div class="yearheatmap-body">' +
@@ -413,6 +434,7 @@
   function render() {
     state = Store.get();
     applyTheme();
+    hideHeatTip();
     const y = window.scrollY; // keep scroll position across re-renders
     document.querySelectorAll('nav.tabs button').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === activeTab);
@@ -782,17 +804,63 @@
     }));
     const edit = $('#inlineedit');
     if (edit) edit.addEventListener('click', () => openEditor(analyticsFocusHabitId));
-    const focusH = habits.find(h => h.id === analyticsFocusHabitId);
-    if (focusH && analyticsMode === 'focus') {
-      document.querySelectorAll('#view [data-cell]').forEach(c => c.addEventListener('click', () => {
-        if (c.dataset.cell > Logic.todayISO()) return;
-        Store.toggleCell(c.dataset.cell, focusH.id);
+    document.querySelectorAll('#view [data-jump-day]').forEach(c => {
+      const go = () => {
+        const iso = c.dataset.jumpDay;
+        const today = Logic.todayISO();
+        if (!iso || iso > today) return;
+        activeTab = 'today';
+        viewDate = iso >= today ? null : iso;
+        hideHeatTip();
         render();
-      }));
-    }
+        window.scrollTo(0, 0);
+      };
+      c.addEventListener('click', go);
+      c.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
+      });
+      c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
+      c.addEventListener('pointermove', ev => moveHeatTip(ev));
+      c.addEventListener('pointerleave', () => hideHeatTip());
+    });
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
+  }
+
+  function showHeatTip(el, ev) {
+    const text = el.getAttribute('data-tip');
+    if (!text) return;
+    let tip = document.getElementById('heat-tip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'heat-tip';
+      tip.className = 'heat-tip';
+      tip.setAttribute('role', 'tooltip');
+      document.body.appendChild(tip);
+    }
+    tip.textContent = text;
+    tip.hidden = false;
+    moveHeatTip(ev);
+  }
+
+  function moveHeatTip(ev) {
+    const tip = document.getElementById('heat-tip');
+    if (!tip || tip.hidden) return;
+    const pad = 12;
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    let x = ev.clientX + 14;
+    let y = ev.clientY + 16;
+    if (x + tw + pad > window.innerWidth) x = ev.clientX - tw - 10;
+    if (y + th + pad > window.innerHeight) y = ev.clientY - th - 10;
+    tip.style.left = Math.max(pad, x) + 'px';
+    tip.style.top = Math.max(pad, y) + 'px';
+  }
+
+  function hideHeatTip() {
+    const tip = document.getElementById('heat-tip');
+    if (tip) tip.hidden = true;
   }
 
   function renderAnalytics() {
@@ -829,14 +897,14 @@
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', true);
+      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInToday: true });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to edit';
+      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to open in Today';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, accent, 'combined', false);
+      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInToday: true });
       heatTitle = 'All habits · ' + year;
-      heatLegendNote = 'Cell shade = share of scheduled habits completed that day';
+      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day to open in Today';
     }
 
     const overview = analyticsMode === 'focus'

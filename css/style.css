@@ -468,11 +468,20 @@ button.calcell:active { transform: scale(.96); }
 .gridfull { display: flex; gap: 3px; overflow-x: auto; padding: 4px 0; }
 .gridfull .col { display: flex; flex-direction: column; gap: 3px; }
 .gridfull .c {
-  width: 13px; height: 13px; border-radius: var(--radius-cell); background: var(--cell0); flex: 0 0 auto; cursor: pointer;
+  width: 13px; height: 13px; border-radius: var(--radius-cell); background: var(--cell0); flex: 0 0 auto; cursor: default;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 50%, transparent);
 }
+.gridfull .c.jump { cursor: pointer; }
+.gridfull .c.jump:hover { outline: 1px solid var(--ink); outline-offset: 0; }
 .gridfull .c.future { visibility: hidden; cursor: default; }
 .gridfull .c.today { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.heat-tip {
+  position: fixed; z-index: 50; max-width: min(280px, calc(100vw - 24px));
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); box-shadow: 0 8px 24px rgba(18, 22, 29, .2);
+  font-size: 12px; line-height: 1.4; font-family: var(--font-mono); pointer-events: none;
+}
+.heat-tip[hidden] { display: none; }
 .maplegend { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--font-mono); }
 .maplegend .heatswatch {
   display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 1px;
