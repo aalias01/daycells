@@ -18,6 +18,68 @@
   let calMonth = null;   // 'YYYY-MM' while calendar is open
   let clientIdAdvanced = false;
   let clientIdReveal = false;
+  let deferredInstall = null; // beforeinstallprompt event
+  let installHintOpen = false; // iOS / fallback instructions toggle
+
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+  }
+  function isIos() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function canNativeInstall() { return !!deferredInstall; }
+  function showInstallUi() { return !isStandalone(); }
+
+  async function triggerInstall() {
+    if (!deferredInstall) return false;
+    const ev = deferredInstall;
+    deferredInstall = null;
+    ev.prompt();
+    try { await ev.userChoice; } catch (e) {}
+    render();
+    return true;
+  }
+
+  function installCardHTML() {
+    if (!showInstallUi()) {
+      return '<div class="card"><h2>Home screen</h2><p class="mini" style="margin:0">Running as an installed app on this device.</p></div>';
+    }
+    if (canNativeInstall()) {
+      return '<div class="card installcard"><h2>Home screen</h2>' +
+        '<p>Add StreakGrid like an app for one-tap access. Works offline after install.</p>' +
+        '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install StreakGrid</button></div>' +
+        '</div>';
+    }
+    if (isIos()) {
+      return '<div class="card installcard"><h2>Home screen</h2>' +
+        '<p>On iPhone/iPad, Safari cannot show a one-tap install dialog. Use Share instead.</p>' +
+        '<div class="btnrow"><button type="button" class="btn" id="installhint">How to add</button></div>' +
+        (installHintOpen
+          ? '<ol class="installsteps"><li>Tap the <b>Share</b> button in Safari.</li>' +
+            '<li>Scroll and tap <b>Add to Home Screen</b>.</li>' +
+            '<li>Tap <b>Add</b>. Open StreakGrid from your home screen next time.</li></ol>'
+          : '') +
+        '</div>';
+    }
+    return '<div class="card installcard"><h2>Home screen</h2>' +
+      '<p>Use your browser menu: <b>Install app</b> or <b>Add to Home screen</b>. Chrome and Edge on Android usually offer a direct install.</p>' +
+      '<div class="btnrow"><button type="button" class="btn ghost" id="installhint">Show tips</button></div>' +
+      (installHintOpen
+        ? '<ol class="installsteps"><li>Open the browser menu (⋮).</li>' +
+          '<li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>' +
+          '<li>Confirm. Launch from the home screen icon afterward.</li></ol>'
+        : '') +
+      '</div>';
+  }
+
+  function wireInstallCard() {
+    const btn = $('#installbtn');
+    if (btn) btn.addEventListener('click', () => { triggerInstall(); });
+    const hint = $('#installhint');
+    if (hint) hint.addEventListener('click', () => { installHintOpen = !installHintOpen; render(); });
+  }
 
   /* Preset library. Grounded in what people actually track (Loggd 2026 data:
      exercise, water, reading, journaling, meditation, sleep, vitamins lead)
@@ -195,6 +257,11 @@
         '</span>' +
       '</div>' +
       cards +
+      (showInstallUi() && canNativeInstall()
+        ? '<div class="card installcard compact"><div class="set-row" style="border:0;padding:0">' +
+            '<span class="grow">Install for home-screen access</span>' +
+            '<button type="button" class="btn" id="installbtn">Install</button></div></div>'
+        : '') +
       '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="One line about this day (optional)">' + esc(Store.getNote(iso)) + '</textarea></div>';
 
     $('#view').dataset.day = today;
@@ -229,6 +296,7 @@
     });
     const jt = $('#jumptoday');
     if (jt) jt.addEventListener('click', () => { viewDate = null; render(); });
+    wireInstallCard();
   }
 
   // ---------- Analytics ----------
@@ -360,7 +428,7 @@
         '<ul>' +
           '<li>Settings → <b>Appearance</b>: light/dark mode, accent (Cobalt / Ink / Teal / Fern), and whether streak grids use the accent or each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (used when grids are <b>By habit</b>, and on emoji tiles / strength bars).</li>' +
-          '<li>On iPhone/Android: browser Share → <b>Add to Home Screen</b> for an app-like icon.</li>' +
+          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install StreakGrid</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
         '</ul>' +
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
@@ -448,6 +516,7 @@
         '</button>' +
         advancedBody +
       '</div>' +
+      installCardHTML() +
       '<div class="card"><h2>Habits</h2>' + habitRows + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Appearance</h2>' +
         '<div class="set-row"><span class="grow">Mode</span><span class="seg" id="themeseg">' +
@@ -488,6 +557,7 @@
       try { await Sync.connect(); } catch (e) { alert(e.message); }
       render();
     });
+    wireInstallCard();
     const dc = $('#disconnect');
     if (dc) dc.addEventListener('click', () => { Sync.disconnect(); render(); });
     const sn = $('#syncnow');
@@ -851,6 +921,15 @@
   if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
+  window.addEventListener('beforeinstallprompt', ev => {
+    ev.preventDefault();
+    deferredInstall = ev;
+    render();
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstall = null;
+    render();
+  });
   /* midnight rollover: refresh the Today view when the date changes */
   setInterval(() => {
     if (activeTab === 'today' && !viewDate && $('#view').dataset.day !== Logic.todayISO()) render();

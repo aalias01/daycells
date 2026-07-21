@@ -27,9 +27,23 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Tap the check on a card to log today. Tap the date for a calendar jump, or use the arrows for nearby days.
 - Tap a card for the 52-week map and stats. Rest day makes every habit optional without breaking streaks.
 - Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
+- Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - Theme: Settings → Appearance (auto / light / dark), accent pack, streak grids Accent or By habit.
-- Phone: Share → Add to Home Screen.
 - In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
+
+## Install (home screen)
+
+StreakGrid is a progressive web app (PWA): after you add it to the home screen, it opens like an app icon and can work offline via the service worker. This is not an App Store download.
+
+| Platform | What to do |
+|----------|------------|
+| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. On Today, an Install chip may show when the browser is ready. |
+| **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. Settings → **Home screen** → **How to add**: Share → **Add to Home Screen** → Add. |
+| **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
+
+Already installed (opened from the home-screen icon): Settings shows that you are running as an installed app.
+
+After a deploy, hard-refresh or reopen the installed app so `sw.js` picks up the new `VERSION`.
 
 ## Google Drive setup (full reference)
 
@@ -133,6 +147,8 @@ icons/
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync dot.
-- Stale UI after deploy: bump `sw.js` VERSION or hard-refresh.
+- Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
+- No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
+- iPhone Install button missing: expected. Use Settings → Home screen → How to add (Safari Share → Add to Home Screen).
 - Want Data Access filled in: add scopes manually (optional section above). Sign-in will not populate that page for you.
 - Fork Sign in does nothing useful with someone else’s Client ID on your domain: create your own Web client and origins.
