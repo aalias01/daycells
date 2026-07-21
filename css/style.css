@@ -370,20 +370,23 @@ nav.tabs button.tab-nudge {
 .welcomesheet h2 { margin: 0 0 6px; font-family: var(--font-display); font-size: 20px; letter-spacing: -0.03em; }
 .welcomesheet .lead { margin: 0 0 4px; font-size: 14px; color: var(--ink); line-height: 1.45; }
 .welcomesheet .mini { margin-top: 10px; }
-.sample-toast {
+.info-banner {
   position: fixed; left: 12px; right: 12px; bottom: calc(64px + env(safe-area-inset-bottom));
   z-index: 35; max-width: 520px; margin: 0 auto;
-  display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left;
-  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  display: flex; gap: 10px; align-items: flex-start; justify-content: space-between;
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 12px 14px;
   background: var(--card); color: var(--ink); box-shadow: 0 8px 24px rgba(18, 22, 29, .18);
-  font-family: var(--font-sans); cursor: pointer;
+  font-family: var(--font-sans);
 }
-.sample-toast strong {
+.info-banner-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; text-align: left; }
+.info-banner-text strong {
   font-size: 13px; font-weight: 650; font-family: var(--font-display); letter-spacing: -0.02em;
 }
-.sample-toast span {
-  font-size: 12px; color: var(--muted); line-height: 1.45;
+.info-banner-text span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.info-banner-actions {
+  display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; align-items: stretch;
 }
+.info-banner-actions .btn { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
 .calhead {
   display: grid; grid-template-columns: 40px 1fr 40px 40px;
   align-items: center; gap: 4px; margin-bottom: 14px;
@@ -573,7 +576,7 @@ button.calcell:active { transform: scale(.96); }
 .iconpick { display: flex; flex-direction: column; gap: 8px; }
 .pickrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .pickrow.emojirow {
-  margin-top: 0; max-height: 148px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  margin-top: 0; max-height: none; overflow: visible;
   padding: 2px; align-content: flex-start;
 }
 .pickrow button.em {

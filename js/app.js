@@ -20,18 +20,21 @@
           localStorage.removeItem(from);
         }
       }
+      /* Unify old tab-nudge flag with the sign-in banner Hide key. */
+      if (localStorage.getItem('dc_signin_banner_seen') == null && localStorage.getItem('dc_signin_nudge_seen')) {
+        localStorage.setItem('dc_signin_banner_seen', localStorage.getItem('dc_signin_nudge_seen'));
+      }
     } catch (e) { /* ignore */ }
   })();
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const DOWS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  /* Habit icon presets for the editor. Users can still type any emoji. */
+  /* Habit icon presets: curated, easy to read. Users can still type any emoji. */
   const EMOJIS = [
-    '⭐', '💪', '🏃', '🚶', '🚴', '🏋️', '🤸', '🧘', '👟', '🏊',
-    '💧', '🥗', '🍎', '🥦', '💊', '☕', '🍵', '🚭', '🚫', '📵',
-    '📚', '📖', '✍️', '📝', '💻', '🧠', '🎯', '🧩', '🗣️', '🎓',
-    '🌙', '🛏️', '⏰', '☀️', '🗓️', '✅', '🔥', '⚡', '🌱', '🌿',
-    '🎸', '🎵', '🎨', '📷', '🎬', '🎮', '🤝', '❤️', '🧹', '🧺',
-    '🐕', '🐱', '🌳', '⛰️', '🧊', '🧃', '🦷', '👁️', '🧴', '🧼'
+    '⭐', '🏃', '💪', '🏋️', '🚴', '🧘', '🚶', '👟',
+    '💧', '🍎', '🥗', '💊', '☕',
+    '📚', '✍️', '💻', '🎯', '🧠',
+    '🌙', '🛏️', '☀️', '🗓️',
+    '🎸', '🎨', '🧹', '📵', '🚭', '❤️'
   ];
 
   let state = null;
@@ -41,8 +44,6 @@
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let welcomeOpen = false;
-  let sampleTipOpen = false;
-  let sampleToastTimer = null;
   let notesOpen = false;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
@@ -394,15 +395,14 @@
     const y = window.scrollY; // keep scroll position across re-renders
     document.querySelectorAll('nav.tabs button').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === activeTab);
-      b.classList.toggle('tab-nudge', b.dataset.tab === 'settings' && shouldShowSigninNudge());
+      b.classList.toggle('tab-nudge', b.dataset.tab === 'settings' && shouldShowSigninBanner());
     });
     const dot = $('#syncdot');
     dot.className = 'syncdot ' + syncDotClass();
     dot.title = syncDotTitle();
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
-    if (activeTab === 'settings' && shouldShowSigninNudge()) {
+    if (activeTab === 'settings' && shouldShowSigninBanner()) {
       signinBtnNudge = true;
-      try { localStorage.setItem('dc_signin_nudge_seen', '1'); } catch (e) {}
     }
     if (activeTab === 'today') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
@@ -410,17 +410,101 @@
     else renderSettings();
     $('#fab').classList.toggle('hidden', activeTab !== 'today');
     renderModal();
-    renderSampleToast();
+    renderInfoBanner();
     window.scrollTo(0, y);
   }
 
-  function shouldShowSigninNudge() {
+  function lsGet(k) {
+    try { return localStorage.getItem(k); } catch (e) { return null; }
+  }
+  function lsSet(k, v) {
+    try { localStorage.setItem(k, v); } catch (e) {}
+  }
+  function lsDel(k) {
+    try { localStorage.removeItem(k); } catch (e) {}
+  }
+
+  function sampleBannerActive() {
+    return lsGet('dc_sample_banner') === '1';
+  }
+
+  function showSampleBanner() {
+    lsSet('dc_sample_banner', '1');
+  }
+
+  function hideSampleBanner() {
+    lsDel('dc_sample_banner');
+  }
+
+  function shouldShowSigninBanner() {
     if (Sync.state().enabled) return false;
-    if (localStorage.getItem('dc_signin_nudge_seen')) return false;
+    if (lsGet('dc_signin_banner_seen')) return false;
+    if (sampleBannerActive()) return false;
+    if (Store.activeHabits().length < 1) return false;
+    /* After sample is cleared/hidden, allow immediately. Otherwise wait a day with 2+ habits. */
+    if (lsGet('dc_sample_cleared') === '1') return true;
     if (Store.activeHabits().length < 2) return false;
-    const first = +(localStorage.getItem('dc_first_seen_at') || 0);
+    const first = +(lsGet('dc_first_seen_at') || 0);
     if (!first) return false;
     return (Date.now() - first) >= 86400000;
+  }
+
+  function infoBannerKind() {
+    if (sampleBannerActive()) return 'sample';
+    if (shouldShowSigninBanner()) return 'signin';
+    return null;
+  }
+
+  function renderInfoBanner() {
+    const kind = infoBannerKind();
+    let el = document.getElementById('info-banner');
+    if (!kind) {
+      if (el) el.remove();
+      document.body.classList.remove('has-info-banner');
+      return;
+    }
+    const title = kind === 'sample' ? 'Sample data loaded' : 'Sync across devices';
+    const body = kind === 'sample'
+      ? 'Explore freely. Reset anytime in Settings → Reset all.'
+      : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
+    const html =
+      '<div class="info-banner-text">' +
+        '<strong>' + title + '</strong>' +
+        '<span>' + body + '</span>' +
+      '</div>' +
+      '<div class="info-banner-actions">' +
+        (kind === 'signin' ? '<button type="button" class="btn" id="banner-settings">Settings</button>' : '') +
+        '<button type="button" class="btn ghost" id="banner-hide">Hide</button>' +
+      '</div>';
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'info-banner';
+      el.className = 'info-banner';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    if (el.dataset.kind !== kind) {
+      el.dataset.kind = kind;
+      el.innerHTML = html;
+      const hide = el.querySelector('#banner-hide');
+      if (hide) hide.addEventListener('click', () => {
+        if (kind === 'sample') {
+          hideSampleBanner();
+          lsSet('dc_sample_cleared', '1');
+        } else {
+          lsSet('dc_signin_banner_seen', '1');
+          lsSet('dc_signin_nudge_seen', '1');
+        }
+        render();
+      });
+      const go = el.querySelector('#banner-settings');
+      if (go) go.addEventListener('click', () => {
+        activeTab = 'settings';
+        render();
+        window.scrollTo(0, 0);
+      });
+    }
+    document.body.classList.add('has-info-banner');
   }
 
   async function doResetAll() {
@@ -430,7 +514,8 @@
       : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
     if (!confirm(msg)) return false;
     Store.resetAll();
-    dismissSampleToast();
+    hideSampleBanner();
+    lsSet('dc_sample_cleared', '1');
     welcomeOpen = false;
     if (connected) {
       try { await Sync.overwriteRemoteBlank(); }
@@ -471,7 +556,7 @@
     calOpen = false;
     mapPage = 0;
     viewDate = null;
-    showSampleToast();
+    showSampleBanner();
     render();
   }
 
@@ -1120,50 +1205,10 @@
       welcomeOpen = false;
       presetsOpen = false;
       activeTab = 'today';
-      showSampleToast();
+      showSampleBanner();
       render();
     });
     /* Do not dismiss by tapping the dim overlay — force a choice. */
-  }
-
-  function showSampleToast() {
-    sampleTipOpen = true;
-    if (sampleToastTimer) clearTimeout(sampleToastTimer);
-    sampleToastTimer = setTimeout(() => { dismissSampleToast(); }, 5000);
-  }
-
-  function dismissSampleToast() {
-    if (sampleToastTimer) {
-      clearTimeout(sampleToastTimer);
-      sampleToastTimer = null;
-    }
-    if (!sampleTipOpen) {
-      const el = document.getElementById('sample-toast');
-      if (el) el.remove();
-      return;
-    }
-    sampleTipOpen = false;
-    const el = document.getElementById('sample-toast');
-    if (el) el.remove();
-  }
-
-  function renderSampleToast() {
-    let el = document.getElementById('sample-toast');
-    if (!sampleTipOpen) {
-      if (el) el.remove();
-      return;
-    }
-    if (el) return;
-    el = document.createElement('button');
-    el.type = 'button';
-    el.id = 'sample-toast';
-    el.className = 'sample-toast';
-    el.setAttribute('role', 'status');
-    el.innerHTML =
-      '<strong>Sample data loaded</strong>' +
-      '<span>Explore the app with this example data. Reset anytime in Settings → Reset all.</span>';
-    el.addEventListener('click', () => { dismissSampleToast(); });
-    document.body.appendChild(el);
   }
 
   // ---------- preset picker ----------
