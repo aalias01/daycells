@@ -36,7 +36,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Theme: Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
-- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). After a first-visit sample load, a tip offers **Reset all** or continue. **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
+- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). After load, a short toast confirms sample data is ready (tap or wait to dismiss). **Reset all** in Settings clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 
 ## Install (home screen)
 

@@ -24,7 +24,15 @@
   })();
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const DOWS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const EMOJIS = ['💪', '🏃', '📚', '🧘', '💧', '🌙', '✍️', '🎯', '🧩', '🥗', '🎸', '🤝'];
+  /* Habit icon presets for the editor. Users can still type any emoji. */
+  const EMOJIS = [
+    '⭐', '💪', '🏃', '🚶', '🚴', '🏋️', '🤸', '🧘', '👟', '🏊',
+    '💧', '🥗', '🍎', '🥦', '💊', '☕', '🍵', '🚭', '🚫', '📵',
+    '📚', '📖', '✍️', '📝', '💻', '🧠', '🎯', '🧩', '🗣️', '🎓',
+    '🌙', '🛏️', '⏰', '☀️', '🗓️', '✅', '🔥', '⚡', '🌱', '🌿',
+    '🎸', '🎵', '🎨', '📷', '🎬', '🎮', '🤝', '❤️', '🧹', '🧺',
+    '🐕', '🐱', '🌳', '⛰️', '🧊', '🧃', '🦷', '👁️', '🧴', '🧼'
+  ];
 
   let state = null;
   let activeTab = 'today';
@@ -34,6 +42,7 @@
   let presetsOpen = false;
   let welcomeOpen = false;
   let sampleTipOpen = false;
+  let sampleToastTimer = null;
   let notesOpen = false;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
@@ -401,6 +410,7 @@
     else renderSettings();
     $('#fab').classList.toggle('hidden', activeTab !== 'today');
     renderModal();
+    renderSampleToast();
     window.scrollTo(0, y);
   }
 
@@ -420,7 +430,7 @@
       : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
     if (!confirm(msg)) return false;
     Store.resetAll();
-    sampleTipOpen = false;
+    dismissSampleToast();
     welcomeOpen = false;
     if (connected) {
       try { await Sync.overwriteRemoteBlank(); }
@@ -453,7 +463,6 @@
       return;
     }
     welcomeOpen = false;
-    sampleTipOpen = false;
     presetsOpen = false;
     notesOpen = false;
     activeTab = 'today';
@@ -462,6 +471,7 @@
     calOpen = false;
     mapPage = 0;
     viewDate = null;
+    showSampleToast();
     render();
   }
 
@@ -728,8 +738,9 @@
         ) + '</div>';
 
     $('#view').innerHTML =
-      '<div class="card"><h2>Overview</h2>' + modeSeg + focusChips + overview + '</div>' +
+      '<div class="card"><h2>View</h2>' + modeSeg + focusChips + '</div>' +
       '<div class="ana-break" role="separator"><span>Analytics</span></div>' +
+      '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
       '<div class="card"><h2>' + heatTitle + '</h2>' +
         yearPickerHTML(years, year) +
         yearHeat +
@@ -993,7 +1004,6 @@
     const root = $('#modal');
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
     if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
-    if (sampleTipOpen) { root.innerHTML = sampleTipHTML(); wireSampleTip(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
     if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); return; }
     if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
@@ -1073,7 +1083,7 @@
     }));
   }
 
-  // ---------- first-run sample prompt + post-sample tip ----------
+  // ---------- first-run sample prompt + post-sample toast ----------
   function welcomeHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Try sample data?</h2>' +
@@ -1109,30 +1119,51 @@
       markWelcomeSeen();
       welcomeOpen = false;
       presetsOpen = false;
-      sampleTipOpen = true;
       activeTab = 'today';
+      showSampleToast();
       render();
     });
     /* Do not dismiss by tapping the dim overlay — force a choice. */
   }
 
-  function sampleTipHTML() {
-    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
-      '<h2>Sample data loaded</h2>' +
-      '<p class="lead">Explore the grids, or start fresh with Reset all. You can always Reset later in Settings.</p>' +
-      '<div class="btnrow">' +
-        '<button type="button" class="btn" id="sample-skip">Explore</button>' +
-        '<button type="button" class="btn danger" id="sample-reset">Reset all</button>' +
-      '</div>' +
-    '</div></div>';
+  function showSampleToast() {
+    sampleTipOpen = true;
+    if (sampleToastTimer) clearTimeout(sampleToastTimer);
+    sampleToastTimer = setTimeout(() => { dismissSampleToast(); }, 5000);
   }
 
-  function wireSampleTip() {
-    $('#sample-skip').addEventListener('click', () => {
-      sampleTipOpen = false;
-      render();
-    });
-    $('#sample-reset').addEventListener('click', () => { doResetAll(); });
+  function dismissSampleToast() {
+    if (sampleToastTimer) {
+      clearTimeout(sampleToastTimer);
+      sampleToastTimer = null;
+    }
+    if (!sampleTipOpen) {
+      const el = document.getElementById('sample-toast');
+      if (el) el.remove();
+      return;
+    }
+    sampleTipOpen = false;
+    const el = document.getElementById('sample-toast');
+    if (el) el.remove();
+  }
+
+  function renderSampleToast() {
+    let el = document.getElementById('sample-toast');
+    if (!sampleTipOpen) {
+      if (el) el.remove();
+      return;
+    }
+    if (el) return;
+    el = document.createElement('button');
+    el.type = 'button';
+    el.id = 'sample-toast';
+    el.className = 'sample-toast';
+    el.setAttribute('role', 'status');
+    el.innerHTML =
+      '<strong>Sample data loaded</strong>' +
+      '<span>Explore the app with this example data. Reset anytime in Settings → Reset all.</span>';
+    el.addEventListener('click', () => { dismissSampleToast(); });
+    document.body.appendChild(el);
   }
 
   // ---------- preset picker ----------
@@ -1288,7 +1319,8 @@
     const s = d.schedule;
     const swatches = Store.PALETTE.map(c =>
       '<button class="sw' + (c === d.color ? ' on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>').join('');
-    const quicks = EMOJIS.map(e => '<button class="em" data-emoji="' + e + '">' + e + '</button>').join('');
+    const quicks = EMOJIS.map(e =>
+      '<button type="button" class="em' + (e === d.emoji ? ' on' : '') + '" data-emoji="' + e + '">' + e + '</button>').join('');
     let schedUI = '';
     if (s.kind === 'weekdays') {
       schedUI = '<div class="dayschips">' + DOWS.map((l, i) =>
@@ -1299,7 +1331,11 @@
     return '<div class="overlay" id="ovl"><div class="sheet editor"><div class="grab"></div>' +
       '<div class="dhead"><span class="t"><div class="name">' + (d.id ? 'Edit habit' : 'New habit') + '</div></span><button id="closeedit">✕</button></div>' +
       '<label class="f">Name</label><input type="text" id="hname" maxlength="40" placeholder="e.g. Morning run" value="' + esc(d.name) + '">' +
-      '<label class="f">Icon</label><div style="display:flex;gap:8px;align-items:center"><input type="text" class="emojiin" id="hemoji" maxlength="4" value="' + esc(d.emoji) + '"><div class="pickrow" style="flex:1">' + quicks + '</div></div>' +
+      '<label class="f">Icon</label>' +
+      '<div class="iconpick">' +
+        '<input type="text" class="emojiin" id="hemoji" maxlength="8" value="' + esc(d.emoji) + '" aria-label="Custom emoji">' +
+        '<div class="pickrow emojirow">' + quicks + '</div>' +
+      '</div>' +
       '<label class="f">Color</label><div class="pickrow">' + swatches + '</div>' +
       '<label class="f">Schedule</label><div class="seg" id="kindseg">' +
         '<button data-kind="daily" class="' + (s.kind === 'daily' ? 'on' : '') + '">Every day</button>' +
@@ -1368,19 +1404,19 @@
   $('#tabs').addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (!b) return;
-    /* Keep sample/welcome sheets open until Try/Skip/Reset — avoids flash when switching tabs. */
-    if (welcomeOpen || sampleTipOpen) return;
+    /* Keep welcome sheet open until Try/Skip — avoids flash when switching tabs. */
+    if (welcomeOpen) return;
     activeTab = b.dataset.tab;
     detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
     render();
   });
   $('#fab').addEventListener('click', () => {
-    if (welcomeOpen || sampleTipOpen) return;
+    if (welcomeOpen) return;
     presetsOpen = true; render();
   });
   /* sync dot doubles as a manual sync / reconnect button */
   $('#syncdot').addEventListener('click', () => {
-    if (welcomeOpen || sampleTipOpen) return;
+    if (welcomeOpen) return;
     if (!Sync.state().enabled) { activeTab = 'settings'; render(); return; }
     Sync.fullSync(true).catch(() => {});
   });
