@@ -501,6 +501,7 @@
     else renderSettings();
     $('#fab').classList.toggle('hidden', activeTab !== 'habits');
     renderModal();
+    maybeRevealSampleBanner();
     renderInfoBanner();
     positionDemoTour();
     window.scrollTo(0, demoTourStep ? 0 : y);
@@ -531,10 +532,12 @@
 
   function showSampleBanner() {
     lsSet('dc_sample_banner', '1');
+    ssDel('dc_sample_banner_pending');
   }
 
   function hideSampleBanner() {
     lsDel('dc_sample_banner');
+    ssDel('dc_sample_banner_pending');
   }
 
   function sampleDataActive() {
@@ -556,7 +559,9 @@
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     sampleWarnPending = null;
-    showSampleBanner();
+    /* Banner waits until after the demo tour (Habits/Settings). */
+    lsDel('dc_sample_banner');
+    ssSet('dc_sample_banner_pending', '1');
   }
 
   function clearSampleActive() {
@@ -573,6 +578,14 @@
     endDemoTour();
   }
 
+  /** After tour: show sample banner on Habits or Settings (not during tour / not on Analytics). */
+  function maybeRevealSampleBanner() {
+    if (!sampleDataActive() || demoTourStep) return;
+    if (ssGet('dc_sample_banner_pending') !== '1' && !sampleBannerActive()) return;
+    if (activeTab !== 'habits' && activeTab !== 'settings') return;
+    showSampleBanner();
+  }
+
   const DEMO_TOUR = [
     {
       tab: 'habits',
@@ -584,13 +597,13 @@
       tab: 'settings',
       target: '#tour-settings',
       title: 'Settings',
-      body: 'Sign in with Google to sync across devices, and set appearance. Tracking without sign-in still works.'
+      body: 'Sync with Google Drive, add Daycells to your home screen, and set appearance. Tracking without sign-in still works.'
     },
     {
       tab: 'analytics',
-      target: '#tour-analytics',
+      target: '#analyticsseg',
       title: 'Analytics',
-      body: 'Filled tracking looks like this. When you are ready for your own habits, tap Start tracking on the banner below.'
+      body: 'All shows your portfolio across habits. Focus one digs into a single habit. Overview and the year heatmap sit below.'
     }
   ];
 
@@ -694,6 +707,7 @@
 
   function shouldWarnSample() {
     if (!sampleDataActive()) return false;
+    if (demoTourStep) return false;
     if (ssGet('dc_sample_warn_skip') === '1') return false;
     const first = ssGet('dc_sample_first_session') === '1';
     const start = +(ssGet('dc_sample_use_start') || 0);
@@ -737,6 +751,7 @@
   }
 
   function infoBannerKind() {
+    if (demoTourStep) return null;
     if (sampleBannerActive()) return 'sample';
     if (shouldShowReconnectBanner()) return 'reconnect';
     if (shouldShowSigninBanner()) return 'signin';
@@ -1375,7 +1390,8 @@
       '<button class="btn ghost" data-del="' + h.id + '">delete</button></div>').join('');
 
     $('#view').innerHTML =
-      '<div class="card" id="tour-settings"><h2>Google Drive sync</h2>' + driveBody +
+      '<div id="tour-settings">' +
+      '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
         clientBlock +
         '<button type="button" class="linkish" id="clientidadv" style="margin-top:10px">' +
           (clientIdAdvanced ? 'Hide Advanced' : 'Advanced: override Client ID') +
@@ -1402,6 +1418,7 @@
           '</button>').join('') +
         '</span></div>' +
         '<div class="mini">Accent paints chrome and the All-habits year heatmap. Focus one uses each habit\'s color (edit a habit to change it).</div>' +
+      '</div>' +
       '</div>' +
       '<div class="card"><h2>Habits</h2><div id="habitlist">' + habitRows + '</div>' + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
