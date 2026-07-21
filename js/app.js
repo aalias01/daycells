@@ -247,6 +247,32 @@
     return true;
   }
 
+  function loadSampleFromSettings() {
+    const hasData = Store.activeHabits().length > 0 || Object.keys((Store.get().cells) || {}).length > 0;
+    const connected = Sync.state().enabled;
+    let msg = hasData
+      ? 'Replace the data in this browser with ~12 weeks of sample habits ending today? Export a backup first if you care about what is here.'
+      : 'Load ~12 weeks of sample habits ending today into this browser?';
+    if (connected) msg += ' You are signed in; the next sync can push this sample to your Drive file.';
+    if (!confirm(msg)) return;
+    try {
+      Store.importJSON(JSON.stringify(Sample.demoDoc()));
+    } catch (e) {
+      alert(e.message || 'Could not load sample data');
+      return;
+    }
+    welcomeOpen = false;
+    sampleTipOpen = false;
+    presetsOpen = false;
+    activeTab = 'today';
+    detailId = null;
+    editDraft = null;
+    calOpen = false;
+    mapPage = 0;
+    viewDate = null;
+    render();
+  }
+
   // ---------- Today ----------
   function renderToday() {
     const today = Logic.todayISO();
@@ -471,7 +497,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
-        '<p class="mini">First visit: you can load ~12 weeks of sample habits ending today. Clear them (or any real data) with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p class="mini">First visit: a prompt can load ~12 weeks of sample habits ending today. Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -589,8 +615,9 @@
         '<button class="btn" id="exportjson">Export JSON</button>' +
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
+        '<button class="btn ghost" id="loadsample">Load sample</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~12 weeks of demo habits. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -654,6 +681,7 @@
       download('streakgrid-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
+    $('#loadsample').addEventListener('click', () => { loadSampleFromSettings(); });
     $('#reset').addEventListener('click', () => { doResetAll(); });
   }
 
