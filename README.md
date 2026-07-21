@@ -34,7 +34,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
 - **Milestone chips:** **3d+** / **7d+** (or **2w+** / **4w+** for weekly habits) on Habits and Analytics when you hit them.
 - Theme: defaults to light. Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
-- Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
+- Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
 - **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). After load, a bottom banner explains sample data (Hide anytime). After that, if you are not signed in, a similar banner can suggest Google sync (also Hide). **Reset all** in Settings clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 

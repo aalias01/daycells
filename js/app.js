@@ -80,19 +80,22 @@
   }
 
   function installCardHTML() {
+    const shareBtn = '<button type="button" class="btn ghost" id="shareapp">Share link</button>';
     if (!showInstallUi()) {
-      return '<div class="card"><h2>Home screen</h2><p class="mini" style="margin:0">Running as an installed app on this device.</p></div>';
+      return '<div class="card installcard"><h2>Home screen</h2>' +
+        '<p class="mini" style="margin:0 0 8px">Running as an installed app on this device.</p>' +
+        '<div class="btnrow">' + shareBtn + '</div></div>';
     }
     if (canNativeInstall()) {
       return '<div class="card installcard"><h2>Home screen</h2>' +
         '<p>Add Daycells like an app for one-tap access. Works offline after install.</p>' +
-        '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install Daycells</button></div>' +
+        '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install Daycells</button>' + shareBtn + '</div>' +
         '</div>';
     }
     if (isIos()) {
       return '<div class="card installcard"><h2>Home screen</h2>' +
-        '<p>On iPhone/iPad, Safari cannot show a one-tap install dialog. Use Share instead.</p>' +
-        '<div class="btnrow"><button type="button" class="btn" id="installhint">How to add</button></div>' +
+        '<p>On iPhone/iPad, Safari cannot show a one-tap install dialog. Use Safari Share → Add to Home Screen. Use <b>Share link</b> below to send the site to someone else.</p>' +
+        '<div class="btnrow"><button type="button" class="btn" id="installhint">How to add</button>' + shareBtn + '</div>' +
         (installHintOpen
           ? '<ol class="installsteps"><li>Tap the <b>Share</b> button in Safari.</li>' +
             '<li>Scroll and tap <b>Add to Home Screen</b>.</li>' +
@@ -102,7 +105,7 @@
     }
     return '<div class="card installcard"><h2>Home screen</h2>' +
       '<p>Use your browser menu: <b>Install app</b> or <b>Add to Home screen</b>. Chrome and Edge on Android usually offer a direct install.</p>' +
-      '<div class="btnrow"><button type="button" class="btn ghost" id="installhint">Show tips</button></div>' +
+      '<div class="btnrow"><button type="button" class="btn ghost" id="installhint">Show tips</button>' + shareBtn + '</div>' +
       (installHintOpen
         ? '<ol class="installsteps"><li>Open the browser menu (⋮).</li>' +
           '<li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>' +
@@ -111,11 +114,37 @@
       '</div>';
   }
 
+  function appShareUrl() {
+    try { return new URL('./', location.href).href; }
+    catch (e) { return location.href.split('#')[0]; }
+  }
+
+  async function shareApp() {
+    const url = appShareUrl();
+    const payload = {
+      title: 'Daycells',
+      text: 'Habit tracker with a contribution grid. Data stays in your browser and your own Google Drive.',
+      url: url
+    };
+    if (navigator.share) {
+      try { await navigator.share(payload); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link copied:\n' + url);
+    } catch (e) {
+      prompt('Copy this link:', url);
+    }
+  }
+
   function wireInstallCard() {
     const btn = $('#installbtn');
     if (btn) btn.addEventListener('click', () => { triggerInstall(); });
     const hint = $('#installhint');
     if (hint) hint.addEventListener('click', () => { installHintOpen = !installHintOpen; render(); });
+    const share = $('#shareapp');
+    if (share) share.addEventListener('click', () => { shareApp(); });
   }
 
   /* Preset library. Grounded in what people actually track (Loggd 2026 data:
@@ -1041,7 +1070,7 @@
         '<ul>' +
           '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one and checks use each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
-          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears. On iPhone/iPad (Safari): Share → <b>Add to Home Screen</b> → Add.</li>' +
+          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears. On iPhone/iPad (Safari): Share → <b>Add to Home Screen</b> → Add. <b>Share link</b> opens the system share sheet (or copies the URL) so you can send Daycells to someone else.</li>' +
         '</ul>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
