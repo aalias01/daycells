@@ -1,4 +1,4 @@
-/* StreakGrid pure logic. No DOM, unit-tested in node.
+/* Daycells pure logic. No DOM, unit-tested in node.
  * Schedules: {kind:'daily'} | {kind:'weekdays', days:[0..6 Mon-first]} | {kind:'perWeek', target:n}
  * Cells: { 'YYYY-MM-DD|habitId': {v:0|1, ts} }  Skips (rest days): { 'YYYY-MM-DD': {v:1, ts} }
  * Streak philosophy: a rest day never breaks anything; only a missed *required*

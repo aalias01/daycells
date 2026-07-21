@@ -1,9 +1,9 @@
-# StreakGrid
+# Daycells
 
 Habit tracker with a GitHub-style contribution grid per habit. Static site. No backend. Your data stays in your browser, and optionally in a JSON file in your own Google Drive.
 
-**Live app:** [https://streakgrid.vercel.app](https://streakgrid.vercel.app)  
-**Source:** [github.com/aalias01/streakgrid](https://github.com/aalias01/streakgrid) (MIT)
+**Live app:** [https://daycells.vercel.app](https://daycells.vercel.app)  
+**Source:** [github.com/aalias01/daycells](https://github.com/aalias01/daycells) (MIT)
 
 Open the live URL, tap +, start checking habits. On the live deploy, a Google OAuth Client ID is already set (via Vercel env at build time). If your Gmail is on the project’s test-user list, open Help or Settings and tap **Sign in with Google**. No paste needed.
 
@@ -15,7 +15,7 @@ Forks and your own deploys: leave committed `js/config.js` empty. Create your ow
 |-------|--------|
 | Browser | Saved automatically as you check habits. Clearing site data deletes it. |
 | Export JSON / CSV | Settings → Export. Import JSON to restore. |
-| Google Drive | Optional. One file: `StreakGrid/streakgrid-data.json` in **the signed-in account’s** Drive. |
+| Google Drive | Optional. One file: `Daycells/daycells-data.json` in **the signed-in account’s** Drive. |
 
 The OAuth **Client ID** identifies the app/project. The **signed-in Google account** owns the Drive file. Two people can share one Client ID and still get separate Drive files if each signs in with their own Gmail.
 
@@ -38,11 +38,11 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 
 ## Install (home screen)
 
-StreakGrid is a progressive web app (PWA): after you add it to the home screen, it opens like an app icon and can work offline via the service worker. This is not an App Store download.
+Daycells is a progressive web app (PWA): after you add it to the home screen, it opens like an app icon and can work offline via the service worker. This is not an App Store download.
 
 | Platform | What to do |
 |----------|------------|
-| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. |
+| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install Daycells** when the button appears. Or browser menu → Install app. |
 | **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. Settings → **Home screen** → **How to add**: Share → **Add to Home Screen** → Add. |
 | **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
 
@@ -52,31 +52,31 @@ After a deploy, hard-refresh or reopen the installed app so `sw.js` picks up the
 
 ## Google Drive setup (full reference)
 
-About five minutes. Free for normal personal use. Use this section when you **create** a Client ID (forks, local serve, or your own Vercel project). On [streakgrid.vercel.app](https://streakgrid.vercel.app), skip to Sign in if you are already a test user.
+About five minutes. Free for normal personal use. Use this section when you **create** a Client ID (forks, local serve, or your own Vercel project). On [daycells.vercel.app](https://daycells.vercel.app), skip to Sign in if you are already a test user.
 
 ### Required (happy path for your own Client ID)
 
 1. Open [console.cloud.google.com](https://console.cloud.google.com) → create a project (any name, e.g. Habit Tracker).
 2. **APIs & Services → Library** → enable **Google Drive API**.
 3. **Google Auth Platform** (search “oauth” in the console if the menu name differs):
-   - **Branding:** app name (e.g. StreakGrid) + your email. Save.
+   - **Branding:** app name (e.g. Daycells) + your email. Save.
    - **Audience:** External. Stay in **Testing**. Under Test users, add every Gmail that should be allowed to sign in (you, spouse, etc.; Testing allows up to 100). Save.
 4. **Clients → Create client → Web application.**
    - Authorized JavaScript origins (no path, no trailing slash):
      - your deploy URL (e.g. `https://your-app.vercel.app`), and/or
      - `http://localhost:8080` for local serve
    - Leave **Authorized redirect URIs** empty.
-   - Create. Copy the **Client ID** only (`….apps.googleusercontent.com`). Ignore the **Client Secret** (not used by this static app; never paste it into StreakGrid or git).
+   - Create. Copy the **Client ID** only (`….apps.googleusercontent.com`). Ignore the **Client Secret** (not used by this static app; never paste it into Daycells or git).
 5. Wire the Client ID (pick one):
    - **Vercel:** Project → Settings → Environment Variables → `GOOGLE_CLIENT_ID` = that string (Production). Redeploy so `npm run build` injects it into `js/config.js`. Do not commit the filled file.
-   - **Or** StreakGrid → Settings → **Advanced: override Client ID** → paste → **Sign in with Google**.
-6. Confirm Google Drive has folder **StreakGrid** / file **streakgrid-data.json**. On another device: same account, Sign in (override paste once per browser if you are not using env inject).
+   - **Or** Daycells → Settings → **Advanced: override Client ID** → paste → **Sign in with Google**.
+6. Confirm Google Drive has folder **Daycells** / file **daycells-data.json**. On another device: same account, Sign in (override paste once per browser if you are not using env inject).
 
 ### Optional: Data Access (scopes in the console)
 
 Data Access is part of the same OAuth project. It lists which permissions the app may request (`userinfo.email`, `drive.file`).
 
-- **Not required for Testing sign-in.** StreakGrid requests those scopes in code when you click Sign in. Google can show the consent popup and grant access even if Data Access is empty.
+- **Not required for Testing sign-in.** Daycells requests those scopes in code when you click Sign in. Google can show the consent popup and grant access even if Data Access is empty.
 - **Signing in does not auto-fill Data Access.** The console tables stay empty until you add scopes and Save.
 - **Still worth doing** so the console matches reality, and before you **publish** the OAuth app.
 
@@ -100,7 +100,7 @@ Household tip: one Client ID is enough. Add each person’s Gmail under Audience
 Defaults are per Google Cloud **project** (the one that owns the Client ID), not per Drive storage:
 
 - OAuth token grants: often ~10,000 / day (see Auth Platform overview). You + a few devices use tens, not thousands.
-- Drive API: high default query limits. StreakGrid does a few calls per sync (debounced). Normal habit use is negligible.
+- Drive API: high default query limits. Daycells does a few calls per sync (debounced). Normal habit use is negligible.
 
 Abuse risk if you **publish**: strangers can sign in on your authorized origin and burn **your** project’s token/Drive quotas (sync fails for everyone on that Client ID). They still cannot read your personal Drive files (`drive.file` is only files the app created in **their** Drive).
 
@@ -143,13 +143,14 @@ js/sync.js            merge sync
 sw.js                 service worker (bump VERSION per deploy)
 manifest.webmanifest  PWA
 icons/
+images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 ```
 
 ## Troubleshoot
 
 - Sign-in fails on a raw file open: serve over http(s).
 - "No OAuth Client ID configured": set `GOOGLE_CLIENT_ID` on the deploy, or paste under Settings → Advanced (creating one is in this README).
-- Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://streakgrid.vercel.app`).
+- Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://daycells.vercel.app`).
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync dot.

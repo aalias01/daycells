@@ -1,4 +1,4 @@
-/* StreakGrid offline-first sync engine.
+/* Daycells offline-first sync engine.
  * localStorage is the working copy; the user's Google Drive is durability.
  *
  * Merge model (conflict-free by construction):
@@ -9,8 +9,10 @@
  *  - settings: newest settingsUpdatedAt wins.
  */
 const Sync = (() => {
-  const ENABLED_KEY = 'sg_sync_enabled';
-  const EMAIL_KEY = 'sg_sync_email';
+  const ENABLED_KEY = 'dc_sync_enabled';
+  const EMAIL_KEY = 'dc_sync_email';
+  const LEGACY_ENABLED = 'sg_sync_enabled';
+  const LEGACY_EMAIL = 'sg_sync_email';
   const PUSH_DELAY = 4000;
 
   let deps = null;      // { getDoc, applyDoc, onStatus }
@@ -19,6 +21,19 @@ const Sync = (() => {
   let running = false;
   let queued = false;
   let lastSync = null;
+
+  function migratePrefs() {
+    try {
+      if (localStorage.getItem(ENABLED_KEY) == null && localStorage.getItem(LEGACY_ENABLED) != null) {
+        localStorage.setItem(ENABLED_KEY, localStorage.getItem(LEGACY_ENABLED));
+        localStorage.removeItem(LEGACY_ENABLED);
+      }
+      if (localStorage.getItem(EMAIL_KEY) == null && localStorage.getItem(LEGACY_EMAIL) != null) {
+        localStorage.setItem(EMAIL_KEY, localStorage.getItem(LEGACY_EMAIL));
+        localStorage.removeItem(LEGACY_EMAIL);
+      }
+    } catch (e) { /* ignore */ }
+  }
 
   const state = () => ({
     enabled: localStorage.getItem(ENABLED_KEY) === '1',
@@ -164,7 +179,10 @@ const Sync = (() => {
     }
   }
 
-  function init(d) { deps = d; }
+  function init(d) {
+    migratePrefs();
+    deps = d;
+  }
 
   return { init, connect, disconnect, resume, schedulePush, fullSync, overwriteRemoteBlank, state, mergeDocs, mergeById, mergeKeyed };
 })();

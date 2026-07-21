@@ -1,7 +1,27 @@
-/* StreakGrid UI. Vanilla JS, no framework (house rule). */
+/* Daycells UI. Vanilla JS, no framework (house rule). */
 (() => {
   'use strict';
   const $ = sel => document.querySelector(sel);
+
+  /* One-time StreakGrid → Daycells localStorage prefs. */
+  (function migrateLocalPrefs() {
+    const pairs = [
+      ['sg_streak_celebrate', 'dc_streak_celebrate'],
+      ['sg_signin_nudge_seen', 'dc_signin_nudge_seen'],
+      ['sg_first_seen_at', 'dc_first_seen_at'],
+      ['sg_welcome_seen', 'dc_welcome_seen'],
+      ['sg_presets_seen', 'dc_presets_seen'],
+      ['sg_gclient', 'dc_gclient']
+    ];
+    try {
+      for (const [from, to] of pairs) {
+        if (localStorage.getItem(to) == null && localStorage.getItem(from) != null) {
+          localStorage.setItem(to, localStorage.getItem(from));
+          localStorage.removeItem(from);
+        }
+      }
+    } catch (e) { /* ignore */ }
+  })();
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const DOWS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const EMOJIS = ['💪', '🏃', '📚', '🧘', '💧', '🌙', '✍️', '🎯', '🧩', '🥗', '🎸', '🤝'];
@@ -55,8 +75,8 @@
     }
     if (canNativeInstall()) {
       return '<div class="card installcard"><h2>Home screen</h2>' +
-        '<p>Add StreakGrid like an app for one-tap access. Works offline after install.</p>' +
-        '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install StreakGrid</button></div>' +
+        '<p>Add Daycells like an app for one-tap access. Works offline after install.</p>' +
+        '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install Daycells</button></div>' +
         '</div>';
     }
     if (isIos()) {
@@ -66,7 +86,7 @@
         (installHintOpen
           ? '<ol class="installsteps"><li>Tap the <b>Share</b> button in Safari.</li>' +
             '<li>Scroll and tap <b>Add to Home Screen</b>.</li>' +
-            '<li>Tap <b>Add</b>. Open StreakGrid from your home screen next time.</li></ol>'
+            '<li>Tap <b>Add</b>. Open Daycells from your home screen next time.</li></ol>'
           : '') +
         '</div>';
     }
@@ -140,7 +160,7 @@
     return (s.target || 1) + '× / week';
   }
 
-  const STREAK_CELEB_KEY = 'sg_streak_celebrate';
+  const STREAK_CELEB_KEY = 'dc_streak_celebrate';
   const STREAK_TIER_RANK = { none: 0, mild: 1, hot: 2 };
   let streakCelebrated = {};
   try { streakCelebrated = JSON.parse(localStorage.getItem(STREAK_CELEB_KEY) || '{}'); } catch (e) { streakCelebrated = {}; }
@@ -373,7 +393,7 @@
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
     if (activeTab === 'settings' && shouldShowSigninNudge()) {
       signinBtnNudge = true;
-      try { localStorage.setItem('sg_signin_nudge_seen', '1'); } catch (e) {}
+      try { localStorage.setItem('dc_signin_nudge_seen', '1'); } catch (e) {}
     }
     if (activeTab === 'today') renderToday();
     else if (activeTab === 'analytics') renderAnalytics();
@@ -386,9 +406,9 @@
 
   function shouldShowSigninNudge() {
     if (Sync.state().enabled) return false;
-    if (localStorage.getItem('sg_signin_nudge_seen')) return false;
+    if (localStorage.getItem('dc_signin_nudge_seen')) return false;
     if (Store.activeHabits().length < 2) return false;
-    const first = +(localStorage.getItem('sg_first_seen_at') || 0);
+    const first = +(localStorage.getItem('dc_first_seen_at') || 0);
     if (!first) return false;
     return (Date.now() - first) >= 86400000;
   }
@@ -396,7 +416,7 @@
   async function doResetAll() {
     const connected = Sync.state().enabled;
     const msg = connected
-      ? 'Erase this browser and overwrite your Google Drive StreakGrid file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.'
+      ? 'Erase this browser and overwrite your Google Drive Daycells file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.'
       : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
     if (!confirm(msg)) return false;
     Store.resetAll();
@@ -716,7 +736,7 @@
     if (st.enabled) {
       driveCard =
         '<div class="card help"><h2>Phone + laptop sync</h2>' +
-        '<p>You are signed in as <b>' + esc(st.email || '?') + '</b>. Checks sync to Google Drive (folder <code>StreakGrid</code>). Use the same Google account on your other device.</p>' +
+        '<p>You are signed in as <b>' + esc(st.email || '?') + '</b>. Checks sync to Google Drive (folder <code>Daycells</code>). Use the same Google account on your other device.</p>' +
         '<div class="btnrow">' +
           '<button class="btn" id="help-sync">Sync now</button>' +
           '<button class="btn ghost" id="help-disconnect">Sign out</button>' +
@@ -742,7 +762,7 @@
         '<p>Optional. This copy of the app has no Client ID yet (common for forks or local serve). Paste one in Settings → Advanced, or create your own (link below).</p>' +
         '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings</button></div>' +
         '<p class="mini">After a Client ID is set, return here for <b>Sign in with Google</b>.</p>' +
-        '<p class="mini">How to create a Client ID: <a href="https://github.com/aalias01/streakgrid#google-drive-setup-full-reference" target="_blank" rel="noopener">setup guide on GitHub</a>.</p>' +
+        '<p class="mini">How to create a Client ID: <a href="https://github.com/aalias01/daycells#google-drive-setup-full-reference" target="_blank" rel="noopener">setup guide on GitHub</a>.</p>' +
         '</div>';
     }
 
@@ -768,7 +788,7 @@
         '<ul>' +
           '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one and checks use each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
-          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install StreakGrid</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
+          '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
         '</ul>' +
         '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
@@ -797,15 +817,15 @@
   function renderSettings() {
     const st = Sync.state();
     const reason = GDrive.unavailableReason ? GDrive.unavailableReason() : null;
-    const override = (localStorage.getItem('sg_gclient') || '').trim();
-    const baked = (((window.SG_CONFIG || {}).googleClientId) || '').trim();
+    const override = (localStorage.getItem('dc_gclient') || '').trim();
+    const baked = (((window.DC_CONFIG || {}).googleClientId) || '').trim();
     const configured = GDrive.configured();
     if (!configured) clientIdAdvanced = true;
 
     const driveBody = st.enabled
       ? '<div class="set-row"><span class="grow">Connected as <b>' + esc(st.email || '?') + '</b></span>' +
         '<button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disconnect">Disconnect</button></div>' +
-        '<div class="mini">Your data lives in a "StreakGrid" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).</div>'
+        '<div class="mini">Your data lives in a "Daycells" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).</div>'
       : '<div class="set-row"><span class="grow">Store your data in your own Google Drive and sync across devices.</span>' +
         '<button class="btn' + (signinBtnNudge ? ' btn-nudge' : '') + '" id="connect">Sign in with Google</button></div>' +
         (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Tracking without sign-in still works.</div>');
@@ -889,7 +909,7 @@
         '<button class="btn danger" id="reset">Reset all</button></div>' +
         '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~6 months of demo habits. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
       '</div>' +
-      '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
+      '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
     const cn = $('#connect');
     if (cn) cn.addEventListener('click', async () => {
@@ -905,15 +925,15 @@
     const cid = $('#clientid');
     if (cid) cid.addEventListener('change', ev => {
       const v = ev.target.value.trim();
-      if (v) localStorage.setItem('sg_gclient', v);
-      else localStorage.removeItem('sg_gclient');
+      if (v) localStorage.setItem('dc_gclient', v);
+      else localStorage.removeItem('dc_gclient');
       render();
     });
     const tog = $('#clientidtoggle');
     if (tog) tog.addEventListener('click', () => { clientIdReveal = !clientIdReveal; render(); });
     const clr = $('#clientidclear');
     if (clr) clr.addEventListener('click', () => {
-      localStorage.removeItem('sg_gclient');
+      localStorage.removeItem('dc_gclient');
       clientIdReveal = false;
       render();
     });
@@ -930,7 +950,7 @@
     document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
       if (confirm('Delete this habit and keep its history out of view? This propagates to synced devices.')) { Store.deleteHabit(b.dataset.del); render(); }
     }));
-    $('#exportjson').addEventListener('click', () => download('streakgrid-' + Logic.todayISO() + '.json', Store.exportJSON(), 'application/json'));
+    $('#exportjson').addEventListener('click', () => download('daycells-' + Logic.todayISO() + '.json', Store.exportJSON(), 'application/json'));
     $('#exportcsv').addEventListener('click', () => {
       /* long format for analysis: one row per logged event */
       const names = {};
@@ -945,7 +965,7 @@
         const s = state.skips[iso];
         if (s.v) lines.push(iso + ',_rest_day,_rest_day,1,' + new Date(s.ts || 0).toISOString());
       }
-      download('streakgrid-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
+      download('daycells-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
     $('#loadsample').addEventListener('click', () => { loadSampleFromSettings(); });
@@ -1051,8 +1071,8 @@
 
   function markWelcomeSeen() {
     try {
-      localStorage.setItem('sg_welcome_seen', '1');
-      localStorage.setItem('sg_presets_seen', '1');
+      localStorage.setItem('dc_welcome_seen', '1');
+      localStorage.setItem('dc_presets_seen', '1');
     } catch (e) {}
   }
 
@@ -1351,7 +1371,7 @@
 
   // ---------- boot ----------
   try {
-    if (!localStorage.getItem('sg_first_seen_at')) localStorage.setItem('sg_first_seen_at', String(Date.now()));
+    if (!localStorage.getItem('dc_first_seen_at')) localStorage.setItem('dc_first_seen_at', String(Date.now()));
   } catch (e) {}
   Store.init(() => Sync.schedulePush());
   Sync.init({
@@ -1365,11 +1385,11 @@
   });
   render();
   /* first run: sample prompt once when empty; Skip opens presets */
-  if (!Store.activeHabits().length && !localStorage.getItem('sg_welcome_seen')) {
+  if (!Store.activeHabits().length && !localStorage.getItem('dc_welcome_seen')) {
     welcomeOpen = true;
     render();
-  } else if (!Store.activeHabits().length && !localStorage.getItem('sg_presets_seen')) {
-    localStorage.setItem('sg_presets_seen', '1');
+  } else if (!Store.activeHabits().length && !localStorage.getItem('dc_presets_seen')) {
+    localStorage.setItem('dc_presets_seen', '1');
     presetsOpen = true;
     render();
   }

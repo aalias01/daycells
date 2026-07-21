@@ -1,6 +1,6 @@
 {
-  "name": "StreakGrid",
-  "short_name": "StreakGrid",
+  "name": "Daycells",
+  "short_name": "Daycells",
   "description": "Habit tracker with a contribution grid per habit. Data stays in your browser and your own Google Drive.",
   "start_url": "./",
   "display": "standalone",

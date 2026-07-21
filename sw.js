@@ -1,8 +1,8 @@
-/* StreakGrid service worker: offline + fast loads.
+/* Daycells service worker: offline + fast loads.
  * Strategy: stale-while-revalidate for same-origin GETs. Bump VERSION to
  * force-refresh cached assets after a deploy.
  */
-const VERSION = 'sg-v39';
+const VERSION = 'dc-v1';
 const PRECACHE = [
   './',
   'index.html',
@@ -16,7 +16,8 @@ const PRECACHE = [
   'js/app.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
-  'icons/icon-512.png'
+  'icons/icon-512.png',
+  'images/og-image.jpg'
 ];
 
 self.addEventListener('install', e => {

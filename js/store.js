@@ -1,10 +1,11 @@
-/* StreakGrid state, persistence, and migration.
+/* Daycells state, persistence, and migration.
  * localStorage is the working copy; Drive (via Sync) is durability.
  * All mutations stamp `ts`/`updatedAt` so multi-device merge is last-write-wins
  * per cell/field, with tombstones for deleted habits.
  */
 const Store = (() => {
-  const LS_KEY = 'streakgrid-v2';
+  const LS_KEY = 'daycells-v2';
+  const LEGACY_LS_KEY = 'streakgrid-v2'; // pre-rename StreakGrid key
   const OLD_KEY = 'ds-prep-habits-v1'; // v1 DS-prep tracker, migrated once
   const PALETTE = ['#3d9970', '#4c7fae', '#9b8ec4', '#d0703c', '#c9a227', '#3a9ea5', '#c06c9c', '#c0442e'];
 
@@ -76,6 +77,18 @@ const Store = (() => {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) { const s = JSON.parse(raw); if (s && s.version === 2) { state = Object.assign(blank(), s); return state; } }
     } catch (e) { /* fall through */ }
+    try {
+      const legacy = localStorage.getItem(LEGACY_LS_KEY);
+      if (legacy) {
+        const s = JSON.parse(legacy);
+        if (s && s.version === 2) {
+          state = Object.assign(blank(), s);
+          save();
+          try { localStorage.removeItem(LEGACY_LS_KEY); } catch (e) {}
+          return state;
+        }
+      }
+    } catch (e) { /* fall through */ }
     const old = (() => { try { return localStorage.getItem(OLD_KEY); } catch (e) { return null; } })();
     state = (old && migrateV1(old)) || blank();
     save();
@@ -140,7 +153,7 @@ const Store = (() => {
   function exportJSON() { return JSON.stringify(state, null, 2); }
   function importJSON(text) {
     const s = JSON.parse(text);
-    if (!s || s.version !== 2 || !s.habits) throw new Error('not a StreakGrid backup');
+    if (!s || s.version !== 2 || !s.habits) throw new Error('not a Daycells backup');
     replaceState(s);
     if (onChange) onChange();
   }

@@ -1,7 +1,7 @@
 {
-  "name": "streakgrid",
+  "name": "daycells",
   "private": true,
-  "description": "StreakGrid habit tracker (static)",
+  "description": "Daycells habit tracker (static)",
   "scripts": {
     "build": "node scripts/inject-client-id.js"
   }

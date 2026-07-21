@@ -13,12 +13,12 @@ const id = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const out = path.join(__dirname, '..', 'js', 'config.js');
 
 const body =
-  '/* StreakGrid deployment config.\n' +
+  '/* Daycells deployment config.\n' +
   ' * Committed copy keeps googleClientId empty. At deploy, scripts/inject-client-id.js\n' +
   ' * may fill this from the GOOGLE_CLIENT_ID env var (Vercel Production).\n' +
   ' * Forks: leave empty, or set your own env / paste in Settings.\n' +
   ' */\n' +
-  'window.SG_CONFIG = {\n' +
+  'window.DC_CONFIG = {\n' +
   '  googleClientId: ' + JSON.stringify(id) + '\n' +
   '};\n';
 

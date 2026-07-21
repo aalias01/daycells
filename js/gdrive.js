@@ -1,20 +1,36 @@
-/* StreakGrid: Google account + Drive storage (BYO cloud).
+/* Daycells: Google account + Drive storage (BYO cloud).
  * Google Identity Services token flow, client-side only, no app server.
  * Scope drive.file: the app can ONLY see files it created, one JSON doc
- * in a visible "StreakGrid" folder in the USER'S OWN Drive.
+ * in a visible "Daycells" folder in the USER'S OWN Drive.
+ * Legacy StreakGrid folder/file is renamed on first open after migrate.
  * Pattern shared with NutriChat (personal/nutrition tracker).
  */
 const GDrive = (() => {
   const SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-  const FILE_NAME = 'streakgrid-data.json';
-  const FOLDER_NAME = 'StreakGrid';
-  const TOKEN_KEY = 'sg_gtoken_v1'; // sessionStorage: survives reloads, not browser restarts
+  const FILE_NAME = 'daycells-data.json';
+  const FOLDER_NAME = 'Daycells';
+  const LEGACY_FILE = 'streakgrid-data.json';
+  const LEGACY_FOLDER = 'StreakGrid';
+  const TOKEN_KEY = 'dc_gtoken_v1'; // sessionStorage: survives reloads, not browser restarts
+  const LEGACY_TOKEN = 'sg_gtoken_v1';
+  const CLIENT_KEY = 'dc_gclient';
+  const LEGACY_CLIENT = 'sg_gclient';
 
   let tokenClient = null;
   let pending = null;
 
+  function migrateClientPref() {
+    try {
+      if (localStorage.getItem(CLIENT_KEY) == null && localStorage.getItem(LEGACY_CLIENT) != null) {
+        localStorage.setItem(CLIENT_KEY, localStorage.getItem(LEGACY_CLIENT));
+        localStorage.removeItem(LEGACY_CLIENT);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   function clientId() {
-    return (localStorage.getItem('sg_gclient') || '').trim() || ((window.SG_CONFIG || {}).googleClientId || '').trim();
+    migrateClientPref();
+    return (localStorage.getItem(CLIENT_KEY) || '').trim() || ((window.DC_CONFIG || {}).googleClientId || '').trim();
   }
   const libReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
   const onHttp = () => location.protocol === 'http:' || location.protocol === 'https:';
@@ -24,7 +40,6 @@ const GDrive = (() => {
   function unavailableReason() {
     if (!onHttp()) return 'Google sign-in needs the app served over http(s). Run: python3 -m http.server 8080, or deploy it (Vercel, GitHub Pages).';
     if (!configured()) return 'No OAuth Client ID yet. Open Advanced below to paste one, or use a deploy that sets GOOGLE_CLIENT_ID.';
-
     if (!libReady()) return 'Google sign-in library is still loading. Try again in a moment.';
     return null;
   }
@@ -40,6 +55,7 @@ const GDrive = (() => {
         if (resp && resp.access_token) {
           const tok = { token: resp.access_token, exp: Date.now() + (Number(resp.expires_in || 3500) - 60) * 1000 };
           sessionStorage.setItem(TOKEN_KEY, JSON.stringify(tok));
+          try { sessionStorage.removeItem(LEGACY_TOKEN); } catch (e) {}
           p.resolve(tok.token);
         } else p.reject(new Error((resp && resp.error) || 'Sign-in failed'));
       },
@@ -52,7 +68,14 @@ const GDrive = (() => {
 
   function storedToken() {
     try {
-      const t = JSON.parse(sessionStorage.getItem(TOKEN_KEY) || 'null');
+      let t = JSON.parse(sessionStorage.getItem(TOKEN_KEY) || 'null');
+      if (!t) {
+        t = JSON.parse(sessionStorage.getItem(LEGACY_TOKEN) || 'null');
+        if (t) {
+          sessionStorage.setItem(TOKEN_KEY, JSON.stringify(t));
+          sessionStorage.removeItem(LEGACY_TOKEN);
+        }
+      }
       return t && t.exp > Date.now() ? t.token : null;
     } catch (e) { return null; }
   }
@@ -75,6 +98,7 @@ const GDrive = (() => {
   function signOut() {
     const t = storedToken();
     sessionStorage.removeItem(TOKEN_KEY);
+    try { sessionStorage.removeItem(LEGACY_TOKEN); } catch (e) {}
     if (t && libReady()) { try { google.accounts.oauth2.revoke(t, () => {}); } catch (e) {} }
   }
 
@@ -113,9 +137,24 @@ const GDrive = (() => {
     return (j.files || [])[0] || null;
   }
 
+  async function patchFileMeta(fileId, body) {
+    await gfetch(API + '/files/' + fileId + '?fields=id,name', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  }
+
   async function ensureFolder() {
-    const found = await findByName(FOLDER_NAME, 'application/vnd.google-apps.folder');
+    let found = await findByName(FOLDER_NAME, 'application/vnd.google-apps.folder');
     if (found) return found.id;
+    const legacy = await findByName(LEGACY_FOLDER, 'application/vnd.google-apps.folder');
+    if (legacy) {
+      try {
+        await patchFileMeta(legacy.id, { name: FOLDER_NAME });
+        return legacy.id;
+      } catch (e) { /* fall through to create */ }
+    }
     const res = await gfetch(API + '/files?fields=id', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -125,11 +164,24 @@ const GDrive = (() => {
   }
 
   async function ensureFile(initialDoc) {
-    const found = await findByName(FILE_NAME);
+    let found = await findByName(FILE_NAME);
     if (found) return { fileId: found.id, created: false };
+
+    const legacy = await findByName(LEGACY_FILE);
+    if (legacy) {
+      try {
+        await patchFileMeta(legacy.id, { name: FILE_NAME });
+        await ensureFolder();
+        return { fileId: legacy.id, created: false };
+      } catch (e) {
+        /* if rename fails, still use the legacy file id so sync continues */
+        return { fileId: legacy.id, created: false };
+      }
+    }
+
     const folderId = await ensureFolder();
     const meta = { name: FILE_NAME, parents: [folderId], mimeType: 'application/json' };
-    const boundary = 'sgb' + Math.random().toString(36).slice(2);
+    const boundary = 'dcb' + Math.random().toString(36).slice(2);
     const body =
       '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n' +
       '--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + JSON.stringify(initialDoc) + '\r\n--' + boundary + '--';
