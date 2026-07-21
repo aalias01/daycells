@@ -282,10 +282,11 @@
               '<li><b>Audience:</b> External. Stay in <b>Testing</b>. Add your Gmail under Test users. Save.</li>' +
               '<li><b>Data Access → Add or remove scopes:</b> use the <b>Filter</b> box at the top of the panel.' +
                 '<ul>' +
-                  '<li>Filter <code>userinfo</code> → check <code>.../auth/userinfo.email</code> (non-sensitive).</li>' +
-                  '<li>Clear the filter, then filter <code>drive.file</code> → check <code>.../auth/drive.file</code> (sensitive; it will not appear under “non-sensitive”).</li>' +
-                  '<li>If Drive API scopes do not show up, enable <b>Google Drive API</b> first (step 2), then reopen this panel.</li>' +
-                  '<li>Click <b>Update</b> at the bottom of the panel (closes it). Then click <b>Save</b> on the main Data Access page. Update alone does not persist.</li>' +
+                  '<li>Filter <code>userinfo</code> → check <code>.../auth/userinfo.email</code>.</li>' +
+                  '<li>Clear the filter, then filter <code>drive.file</code> → check <code>.../auth/drive.file</code>.</li>' +
+                  '<li>Both usually appear under <b>Your non-sensitive scopes</b> after you save.</li>' +
+                  '<li>If <code>drive.file</code> is missing from the picker, enable <b>Google Drive API</b> first (step 2), then reopen this panel.</li>' +
+                  '<li>Click <b>Update</b> at the bottom of the panel. Then click <b>Save</b> on the main Data Access page. Update alone does not persist.</li>' +
                 '</ul>' +
               '</li>' +
             '</ul>' +
@@ -293,6 +294,7 @@
           '<li><b>Clients → Create client → Web application.</b> Under Authorized JavaScript origins, add the origin shown above. Leave redirect URIs empty. Create. Copy the <b>Client ID</b> only. Ignore the Client Secret.</li>' +
           '<li>Back here: <b>Settings</b> → paste the Client ID → <b>Sign in with Google</b>.</li>' +
         '</ol>' +
+        '<p class="mini"><b>Order:</b> Data Access and creating the Client can happen in either order. Scopes must be Saved before Drive sign-in works. Client first, scopes later: Save Data Access, then Sign in again (Disconnect first if needed). Scopes first, Client later: paste the new Client ID and Sign in.</p>' +
         '<p class="mini">After sign-in, Drive should show a folder named <code>StreakGrid</code> with <code>streakgrid-data.json</code>. On a second device, paste the same Client ID once, sign in with the same Google account.</p>' +
       '</div>' +
       '<div class="card help"><h2>If something fails</h2>' +
@@ -300,6 +302,7 @@
           '<li><b>Popup fails / origin error:</b> the origin above is missing from your OAuth client.</li>' +
           '<li><b>Access blocked:</b> your Gmail is not in Audience → Test users (or publish the OAuth app).</li>' +
           '<li><b>No Client ID configured:</b> paste it in Settings and wait a moment, then Sign in again.</li>' +
+          '<li><b>Sign-in works but Drive errors / empty Data Access tables:</b> you clicked Update but not Save on Data Access. Add both scopes again, Update, then Save.</li>' +
           '<li><b>Data missing after clearing the browser:</b> Sign in again to pull Drive, or import a JSON export.</li>' +
         '</ul>' +
         '<div class="btnrow"><button class="btn" id="helptosettings">Go to Settings</button></div>' +
