@@ -640,7 +640,7 @@
     }
     const title = kind === 'sample' ? 'Sample data loaded' : 'Sync across devices';
     const body = kind === 'sample'
-      ? 'Explore freely. Reset anytime in Settings → Reset all.'
+      ? 'Demo history only. Reset all before tracking your own habits.'
       : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
     const html =
       '<div class="info-banner-text">' +
@@ -1163,7 +1163,8 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">First visit: a prompt can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. While sample is loaded, later sessions show a reminder (Hide / Hide for 7 days / Reset). After a short explore window, edits warn until you <b>Reset all</b>. Google sync nudge stays off until sample is cleared. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p class="mini">If sample data is loaded, use Settings → <b>Reset all</b> before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
+        '<p class="mini">First visit can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -1277,7 +1278,7 @@
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn ghost" id="loadsample">Load sample</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~6 months of demo habits. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~6 months of demo habits. If you tried sample data, <b>Reset all</b> before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -1570,7 +1571,7 @@
         '<button type="button" class="btn" id="welcome-sample">Try sample</button>' +
         '<button type="button" class="btn ghost" id="welcome-skip">Skip</button>' +
       '</div>' +
-      '<p class="mini">You can clear sample (or any) data later with Settings → Reset all.</p>' +
+      '<p class="mini">Explore the demo, then Settings → Reset all before adding your own habits.</p>' +
     '</div></div>';
   }
 
