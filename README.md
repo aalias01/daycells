@@ -37,7 +37,7 @@ StreakGrid is a progressive web app (PWA): after you add it to the home screen, 
 
 | Platform | What to do |
 |----------|------------|
-| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. On Today, an Install chip may show when the browser is ready. |
+| **Android** (Chrome / Edge) | Settings → **Home screen** → **Install StreakGrid** when the button appears. Or browser menu → Install app. On Today, an Install chip may show when the browser is ready (Hide remembers via Settings; install stays under Home screen). |
 | **iPhone / iPad** (Safari) | Apple does not allow a one-tap install dialog. Settings → **Home screen** → **How to add**: Share → **Add to Home Screen** → Add. |
 | **Desktop** (Chrome / Edge) | Browser may offer Install in the address bar or menu; Settings → Home screen shows the same when available. |
 

@@ -31,6 +31,9 @@
   }
   function canNativeInstall() { return !!deferredInstall; }
   function showInstallUi() { return !isStandalone(); }
+  function showTodayInstallBanner() {
+    return showInstallUi() && canNativeInstall() && !(state && state.settings && state.settings.hideTodayInstall);
+  }
 
   async function triggerInstall() {
     if (!deferredInstall) return false;
@@ -46,10 +49,19 @@
     if (!showInstallUi()) {
       return '<div class="card"><h2>Home screen</h2><p class="mini" style="margin:0">Running as an installed app on this device.</p></div>';
     }
+    const tipHidden = !!(state.settings || {}).hideTodayInstall;
+    const tipRow =
+      '<div class="set-row"><span class="grow">Install tip on Today</span><span class="seg" id="installtipseg">' +
+        '<button type="button" data-install-tip="show" class="' + (!tipHidden ? 'on' : '') + '">Show</button>' +
+        '<button type="button" data-install-tip="hide" class="' + (tipHidden ? 'on' : '') + '">Hide</button>' +
+      '</span></div>' +
+      '<div class="mini">Home-screen install stays available here either way.</div>';
+
     if (canNativeInstall()) {
       return '<div class="card installcard"><h2>Home screen</h2>' +
         '<p>Add StreakGrid like an app for one-tap access. Works offline after install.</p>' +
         '<div class="btnrow"><button type="button" class="btn" id="installbtn">Install StreakGrid</button></div>' +
+        tipRow +
         '</div>';
     }
     if (isIos()) {
@@ -61,6 +73,7 @@
             '<li>Scroll and tap <b>Add to Home Screen</b>.</li>' +
             '<li>Tap <b>Add</b>. Open StreakGrid from your home screen next time.</li></ol>'
           : '') +
+        tipRow +
         '</div>';
     }
     return '<div class="card installcard"><h2>Home screen</h2>' +
@@ -71,6 +84,7 @@
           '<li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>' +
           '<li>Confirm. Launch from the home screen icon afterward.</li></ol>'
         : '') +
+      tipRow +
       '</div>';
   }
 
@@ -79,6 +93,15 @@
     if (btn) btn.addEventListener('click', () => { triggerInstall(); });
     const hint = $('#installhint');
     if (hint) hint.addEventListener('click', () => { installHintOpen = !installHintOpen; render(); });
+    const hideToday = $('#hideinstalltoday');
+    if (hideToday) hideToday.addEventListener('click', () => {
+      Store.setSetting('hideTodayInstall', true);
+      render();
+    });
+    document.querySelectorAll('[data-install-tip]').forEach(b => b.addEventListener('click', () => {
+      Store.setSetting('hideTodayInstall', b.dataset.installTip === 'hide');
+      render();
+    }));
   }
 
   /* Preset library. Grounded in what people actually track (Loggd 2026 data:
@@ -257,10 +280,12 @@
         '</span>' +
       '</div>' +
       cards +
-      (showInstallUi() && canNativeInstall()
+      (showTodayInstallBanner()
         ? '<div class="card installcard compact"><div class="set-row" style="border:0;padding:0">' +
             '<span class="grow">Install for home-screen access</span>' +
-            '<button type="button" class="btn" id="installbtn">Install</button></div></div>'
+            '<button type="button" class="btn" id="installbtn">Install</button>' +
+            '<button type="button" class="btn ghost" id="hideinstalltoday">Hide</button></div>' +
+            '<div class="mini">You can install anytime from Settings → Home screen.</div></div>'
         : '') +
       '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="One line about this day (optional)">' + esc(Store.getNote(iso)) + '</textarea></div>';
 
