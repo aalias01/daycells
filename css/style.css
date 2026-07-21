@@ -482,6 +482,11 @@ button.calcell:active { transform: scale(.96); }
   font-size: 12px; line-height: 1.4; font-family: var(--font-mono); pointer-events: none;
 }
 .heat-tip[hidden] { display: none; }
+.heat-day-sheet { max-width: 420px; }
+.heat-day-sheet .heat-day-body {
+  margin: 0 0 14px; font-size: 13px; line-height: 1.45; color: var(--ink);
+  font-family: var(--font-mono);
+}
 .maplegend { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--font-mono); }
 .maplegend .heatswatch {
   display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 1px;

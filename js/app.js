@@ -435,6 +435,7 @@
     state = Store.get();
     applyTheme();
     hideHeatTip();
+    hideHeatDaySheet();
     const y = window.scrollY; // keep scroll position across re-renders
     document.querySelectorAll('nav.tabs button').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === activeTab);
@@ -812,20 +813,35 @@
         activeTab = 'habits';
         viewDate = iso >= today ? null : iso;
         hideHeatTip();
+        hideHeatDaySheet();
         render();
         window.scrollTo(0, 0);
       };
-      c.addEventListener('click', go);
+      c.addEventListener('click', () => {
+        /* Laptop: jump immediately. Phone: confirm sheet (avoids accidental navigation). */
+        if (heatJumpDirect()) go();
+        else showHeatDaySheet(c, go);
+      });
       c.addEventListener('keydown', ev => {
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
       });
-      c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
-      c.addEventListener('pointermove', ev => moveHeatTip(ev));
-      c.addEventListener('pointerleave', () => hideHeatTip());
+      if (heatJumpDirect()) {
+        c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
+        c.addEventListener('pointermove', ev => moveHeatTip(ev));
+        c.addEventListener('pointerleave', () => hideHeatTip());
+      }
     });
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
+  }
+
+  function heatJumpDirect() {
+    try {
+      return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    } catch (e) {
+      return !('ontouchstart' in window);
+    }
   }
 
   function showHeatTip(el, ev) {
@@ -861,6 +877,35 @@
   function hideHeatTip() {
     const tip = document.getElementById('heat-tip');
     if (tip) tip.hidden = true;
+  }
+
+  function showHeatDaySheet(el, onOpen) {
+    hideHeatTip();
+    hideHeatDaySheet();
+    const tip = el.getAttribute('data-tip') || el.dataset.jumpDay || '';
+    const body = tip.replace(/ · Open in Habits$/, '');
+    const ovl = document.createElement('div');
+    ovl.id = 'heat-day-ovl';
+    ovl.className = 'overlay';
+    ovl.innerHTML =
+      '<div class="sheet heat-day-sheet" role="dialog" aria-label="Day details">' +
+        '<div class="grab"></div>' +
+        '<p class="heat-day-body">' + esc(body) + '</p>' +
+        '<div class="btnrow">' +
+          '<button type="button" class="btn" id="heat-day-open">Open in Habits</button>' +
+          '<button type="button" class="btn ghost" id="heat-day-close">Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ovl);
+    const close = () => hideHeatDaySheet();
+    ovl.addEventListener('click', ev => { if (ev.target.id === 'heat-day-ovl') close(); });
+    ovl.querySelector('#heat-day-close').addEventListener('click', close);
+    ovl.querySelector('#heat-day-open').addEventListener('click', () => { close(); onOpen(); });
+  }
+
+  function hideHeatDaySheet() {
+    const ovl = document.getElementById('heat-day-ovl');
+    if (ovl) ovl.remove();
   }
 
   function renderAnalytics() {
@@ -899,12 +944,12 @@
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: true });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
-      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day to open in Habits';
+      heatLegendNote = 'Full color = done · faint = rest or off day · tap a day for details';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
       yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: true });
       heatTitle = 'All habits · ' + year;
-      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day to open in Habits';
+      heatLegendNote = 'Cell shade = share of scheduled habits completed that day · tap a day for details';
     }
 
     const overview = analyticsMode === 'focus'
