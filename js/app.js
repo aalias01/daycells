@@ -44,7 +44,12 @@
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let welcomeOpen = false;
+  let sampleRemindOpen = false;
+  let sampleWarnOpen = false;
+  let sampleWarnPending = null; // fn to run after Skip on modification warning
   let notesOpen = false;
+  const SAMPLE_GRACE_MS = 2 * 60 * 1000;
+  const SAMPLE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let analyticsMode = 'all';       // 'all' | 'focus'
@@ -471,6 +476,10 @@
     applyTheme();
     hideHeatTip();
     hideHeatDaySheet();
+    armSampleSession();
+    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId) {
+      sampleRemindOpen = true;
+    }
     const y = window.scrollY; // keep scroll position across re-renders
     document.querySelectorAll('nav.tabs button').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === activeTab);
@@ -502,6 +511,15 @@
   function lsDel(k) {
     try { localStorage.removeItem(k); } catch (e) {}
   }
+  function ssGet(k) {
+    try { return sessionStorage.getItem(k); } catch (e) { return null; }
+  }
+  function ssSet(k, v) {
+    try { sessionStorage.setItem(k, v); } catch (e) {}
+  }
+  function ssDel(k) {
+    try { sessionStorage.removeItem(k); } catch (e) {}
+  }
 
   function sampleBannerActive() {
     return lsGet('dc_sample_banner') === '1';
@@ -515,8 +533,86 @@
     lsDel('dc_sample_banner');
   }
 
+  function sampleDataActive() {
+    return lsGet('dc_sample_active') === '1';
+  }
+
+  /* Older installs only had the dismissible banner. Promote to durable flag (no first-session grace). */
+  if (lsGet('dc_sample_banner') === '1' && lsGet('dc_sample_active') !== '1') {
+    lsSet('dc_sample_active', '1');
+  }
+
+  function markSampleActive() {
+    lsSet('dc_sample_active', '1');
+    lsDel('dc_sample_remind_until');
+    ssSet('dc_sample_first_session', '1');
+    ssSet('dc_sample_use_start', String(Date.now()));
+    ssDel('dc_sample_warn_skip');
+    ssDel('dc_sample_remind_hide');
+    sampleRemindOpen = false;
+    sampleWarnOpen = false;
+    sampleWarnPending = null;
+    showSampleBanner();
+  }
+
+  function clearSampleActive() {
+    lsDel('dc_sample_active');
+    lsDel('dc_sample_remind_until');
+    hideSampleBanner();
+    ssDel('dc_sample_first_session');
+    ssDel('dc_sample_use_start');
+    ssDel('dc_sample_warn_skip');
+    ssDel('dc_sample_remind_hide');
+    sampleRemindOpen = false;
+    sampleWarnOpen = false;
+    sampleWarnPending = null;
+  }
+
+  function armSampleSession() {
+    if (!sampleDataActive()) return;
+    if (!ssGet('dc_sample_use_start')) ssSet('dc_sample_use_start', String(Date.now()));
+  }
+
+  function sampleRemindSnoozed() {
+    const until = +(lsGet('dc_sample_remind_until') || 0);
+    return !!(until && Date.now() < until);
+  }
+
+  /** Session reminder for later tab sessions (not the tab that just loaded sample). */
+  function shouldShowSampleRemind() {
+    if (!sampleDataActive()) return false;
+    if (welcomeOpen || sampleWarnOpen) return false;
+    if (sampleRemindSnoozed()) return false;
+    if (ssGet('dc_sample_remind_hide') === '1') return false;
+    if (ssGet('dc_sample_first_session') === '1') return false;
+    return true;
+  }
+
+  function shouldWarnSample() {
+    if (!sampleDataActive()) return false;
+    if (ssGet('dc_sample_warn_skip') === '1') return false;
+    const first = ssGet('dc_sample_first_session') === '1';
+    const start = +(ssGet('dc_sample_use_start') || 0);
+    if (first && start && (Date.now() - start) < SAMPLE_GRACE_MS) return false;
+    return true;
+  }
+
+  /** Run fn now, or after Skip on the sample modification warning. */
+  function gateSampleMod(fn) {
+    armSampleSession();
+    if (!shouldWarnSample()) {
+      fn();
+      return;
+    }
+    sampleWarnPending = fn;
+    sampleWarnOpen = true;
+    sampleRemindOpen = false;
+    render();
+  }
+
   function shouldShowSigninBanner() {
     if (Sync.state().enabled) return false;
+    if (sampleDataActive()) return false;
     if (lsGet('dc_signin_banner_seen')) return false;
     if (sampleBannerActive()) return false;
     if (Store.activeHabits().length < 1) return false;
@@ -586,14 +682,15 @@
     document.body.classList.add('has-info-banner');
   }
 
-  async function doResetAll() {
+  async function doResetAll(opts) {
+    const skipConfirm = !!(opts && opts.skipConfirm);
     const connected = Sync.state().enabled;
     const msg = connected
       ? 'Erase this browser and overwrite your Google Drive Daycells file with empty data? A later sync will not bring the old habits back. Export a backup first if you want them.'
       : 'Erase all habits and checks in this browser? Export a backup first if you care about them.';
-    if (!confirm(msg)) return false;
+    if (!skipConfirm && !confirm(msg)) return false;
     Store.resetAll();
-    hideSampleBanner();
+    clearSampleActive();
     lsSet('dc_sample_cleared', '1');
     welcomeOpen = false;
     if (connected) {
@@ -635,7 +732,7 @@
     calOpen = false;
     mapPage = 0;
     viewDate = null;
-    showSampleBanner();
+    markSampleActive();
     render();
   }
 
@@ -703,23 +800,29 @@
     document.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', ev => {
       ev.stopPropagation();
       const id = b.dataset.toggle;
-      const nowDone = !Logic.isDone(state.cells, iso, id);
-      // instant feedback, then reconcile with a full render
-      b.classList.toggle('done', nowDone);
-      b.classList.add('pop');
-      if (nowDone) { b.style.background = b.dataset.color; b.style.borderColor = b.dataset.color; }
-      else { b.style.background = ''; b.style.borderColor = ''; }
-      if (nowDone && navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
-      Store.toggleCell(iso, id);
-      setTimeout(render, 160);
+      gateSampleMod(() => {
+        const nowDone = !Logic.isDone(state.cells, iso, id);
+        b.classList.toggle('done', nowDone);
+        b.classList.add('pop');
+        if (nowDone) { b.style.background = b.dataset.color; b.style.borderColor = b.dataset.color; }
+        else { b.style.background = ''; b.style.borderColor = ''; }
+        if (nowDone && navigator.vibrate) { try { navigator.vibrate(10); } catch (e) {} }
+        Store.toggleCell(iso, id);
+        setTimeout(render, 160);
+      });
     }));
     document.querySelectorAll('[data-edit-habit]').forEach(b => b.addEventListener('click', ev => {
       if (ev.target.closest('[data-toggle]')) return;
       ev.preventDefault();
       openEditor(b.dataset.editHabit);
     }));
-    $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
-    $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
+    $('#restchip').addEventListener('click', () => {
+      gateSampleMod(() => { Store.toggleSkip(iso); render(); });
+    });
+    $('#daynote').addEventListener('change', ev => {
+      const val = ev.target.value;
+      gateSampleMod(() => { Store.setNote(iso, val); });
+    });
     $('#seenotes').addEventListener('click', () => { notesOpen = true; render(); });
     $('#pickday').addEventListener('click', () => {
       calMonth = iso.slice(0, 7);
@@ -1060,7 +1163,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">First visit: a prompt can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p class="mini">First visit: a prompt can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. While sample is loaded, later sessions show a reminder (Hide / Hide for 7 days / Reset). After a short explore window, edits warn until you <b>Reset all</b>. Google sync nudge stays off until sample is cleared. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -1215,7 +1318,9 @@
     document.querySelectorAll('[data-archive]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.archive, { archived: true }); render(); }));
     document.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.restore, { archived: false }); render(); }));
     document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
-      if (confirm('Delete this habit and keep its history out of view? This propagates to synced devices.')) { Store.deleteHabit(b.dataset.del); render(); }
+      gateSampleMod(() => {
+        if (confirm('Delete this habit and keep its history out of view? This propagates to synced devices.')) { Store.deleteHabit(b.dataset.del); render(); }
+      });
     }));
     $('#exportjson').addEventListener('click', () => download('daycells-' + Logic.todayISO() + '.json', Store.exportJSON(), 'application/json'));
     $('#exportcsv').addEventListener('click', () => {
@@ -1242,6 +1347,8 @@
   // ---------- detail + editor + sample prompts + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
+    if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
+    if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
     if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
@@ -1253,6 +1360,61 @@
       root.innerHTML = detailHTML(h); wireDetail(h); return;
     }
     root.innerHTML = '';
+  }
+
+  function sampleRemindHTML() {
+    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
+      '<h2>Sample data is loaded</h2>' +
+      '<p>This history is demo data. Reset all to start clean before tracking real habits.</p>' +
+      '<div class="btnrow">' +
+        '<button type="button" class="btn" id="sample-remind-reset">Reset all</button>' +
+        '<button type="button" class="btn ghost" id="sample-remind-hide">Hide</button>' +
+      '</div>' +
+      '<div class="btnrow" style="margin-top:8px">' +
+        '<button type="button" class="btn ghost" id="sample-remind-snooze">Hide for 7 days</button>' +
+      '</div>' +
+    '</div></div>';
+  }
+
+  function wireSampleRemind() {
+    $('#sample-remind-reset').addEventListener('click', () => { doResetAll({ skipConfirm: true }); });
+    $('#sample-remind-hide').addEventListener('click', () => {
+      ssSet('dc_sample_remind_hide', '1');
+      sampleRemindOpen = false;
+      render();
+    });
+    $('#sample-remind-snooze').addEventListener('click', () => {
+      lsSet('dc_sample_remind_until', String(Date.now() + SAMPLE_SNOOZE_MS));
+      ssSet('dc_sample_remind_hide', '1');
+      sampleRemindOpen = false;
+      render();
+    });
+  }
+
+  function sampleWarnHTML() {
+    return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
+      '<h2>Still using sample data</h2>' +
+      '<p>Your changes sit on top of demo history. Reset all to start clean, or Skip to keep exploring this session.</p>' +
+      '<div class="btnrow">' +
+        '<button type="button" class="btn" id="sample-warn-reset">Reset all</button>' +
+        '<button type="button" class="btn ghost" id="sample-warn-skip">Skip</button>' +
+      '</div>' +
+    '</div></div>';
+  }
+
+  function wireSampleWarn() {
+    $('#sample-warn-reset').addEventListener('click', () => {
+      sampleWarnPending = null;
+      doResetAll({ skipConfirm: true });
+    });
+    $('#sample-warn-skip').addEventListener('click', () => {
+      ssSet('dc_sample_warn_skip', '1');
+      const pending = sampleWarnPending;
+      sampleWarnPending = null;
+      sampleWarnOpen = false;
+      if (pending) pending();
+      else render();
+    });
   }
 
   /** Pointer drag reorder for Settings → Habits (mouse + touch). */
@@ -1437,7 +1599,7 @@
       welcomeOpen = false;
       presetsOpen = false;
       activeTab = 'habits';
-      showSampleBanner();
+      markSampleActive();
       render();
     });
     /* Do not dismiss by tapping the dim overlay — force a choice. */
@@ -1469,12 +1631,17 @@
   function wirePresets() {
     $('#closepresets').addEventListener('click', () => { presetsOpen = false; render(); });
     $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') { presetsOpen = false; render(); } });
-    $('#customhabit').addEventListener('click', () => { presetsOpen = false; openEditor(null); });
+    $('#customhabit').addEventListener('click', () => {
+      presetsOpen = false;
+      openEditor(null);
+    });
     $('#addpresets').addEventListener('click', () => {
-      const picked = [...document.querySelectorAll('[data-preset]:checked')].map(cb => PRESETS[+cb.dataset.preset]);
-      if (!picked.length) { alert('Tick at least one, or create your own.'); return; }
-      picked.forEach(p => Store.addHabit({ name: p.name, emoji: p.emoji, color: p.color, schedule: JSON.parse(JSON.stringify(p.schedule)) }));
-      presetsOpen = false; render();
+      gateSampleMod(() => {
+        const picked = [...document.querySelectorAll('[data-preset]:checked')].map(cb => PRESETS[+cb.dataset.preset]);
+        if (!picked.length) { alert('Tick at least one, or create your own.'); return; }
+        picked.forEach(p => Store.addHabit({ name: p.name, emoji: p.emoji, color: p.color, schedule: JSON.parse(JSON.stringify(p.schedule)) }));
+        presetsOpen = false; render();
+      });
     });
   }
 
@@ -1576,7 +1743,7 @@
     if (newer) newer.addEventListener('click', () => { mapPage = Math.max(0, mapPage - 1); render(); });
     document.querySelectorAll('#ovl [data-cell]').forEach(c => c.addEventListener('click', () => {
       if (c.dataset.cell > Logic.todayISO()) return;
-      Store.toggleCell(c.dataset.cell, h.id); render();
+      gateSampleMod(() => { Store.toggleCell(c.dataset.cell, h.id); render(); });
     }));
     /* Narrow sheets: keep the newest weeks in view (GitHub-style left=older). */
     const gf = document.querySelector('#ovl .gridfull');
@@ -1584,11 +1751,13 @@
   }
 
   function openEditor(id) {
-    const h = id ? Store.getHabit(id) : null;
-    editDraft = h
-      ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: normalizeSchedule(JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' }))) }
-      : { id: null, name: '', emoji: '⭐', color: Store.PALETTE[Store.activeHabits().length % Store.PALETTE.length], schedule: { kind: 'daily' } };
-    render();
+    gateSampleMod(() => {
+      const h = id ? Store.getHabit(id) : null;
+      editDraft = h
+        ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: normalizeSchedule(JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' }))) }
+        : { id: null, name: '', emoji: '⭐', color: Store.PALETTE[Store.activeHabits().length % Store.PALETTE.length], schedule: { kind: 'daily' } };
+      render();
+    });
   }
 
   function editorHTML() {
@@ -1684,7 +1853,7 @@
     if (!f) return;
     const r = new FileReader();
     r.onload = () => {
-      try { Store.importJSON(r.result); render(); alert('Imported.'); }
+      try { Store.importJSON(r.result); clearSampleActive(); render(); alert('Imported.'); }
       catch (e) { alert('Import failed: ' + e.message); }
     };
     r.readAsText(f);
@@ -1766,6 +1935,7 @@
 
     function sheetOpen() {
       return !!(document.querySelector('.overlay') || document.getElementById('heat-day-ovl') ||
+        sampleRemindOpen || sampleWarnOpen ||
         welcomeOpen || presetsOpen || notesOpen || calOpen || editDraft || detailId);
     }
 
@@ -1799,8 +1969,8 @@
   }
   wireTabSwipe();
   $('#fab').addEventListener('click', () => {
-    if (welcomeOpen) return;
-    presetsOpen = true; render();
+    if (welcomeOpen || sampleRemindOpen || sampleWarnOpen) return;
+    gateSampleMod(() => { presetsOpen = true; render(); });
   });
   /* sync dot doubles as a manual sync / reconnect button */
   $('#syncdot').addEventListener('click', () => {

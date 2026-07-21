@@ -42,7 +42,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
-- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). After load, a bottom banner explains sample data (Hide anytime). After that, if you are not signed in, a similar banner can suggest Google sync (also Hide). **Reset all** in Settings clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
+- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). While sample is loaded, later sessions show a reminder (**Hide** / **Hide for 7 days** / **Reset all**). After a short explore window on the first session, edits warn until you reset. Google sync nudge stays off until sample is cleared. Bottom banner also explains sample (Hide anytime). **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 
 ## Install (home screen)
 
