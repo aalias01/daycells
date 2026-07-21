@@ -469,8 +469,7 @@ button.calcell:active { transform: scale(.96); }
 /* analytics */
 .seg.analyticsseg { margin: 0 0 10px; max-width: 280px; }
 .habitchips {
-  display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 10px; margin-top: -4px;
-  -webkit-overflow-scrolling: touch;
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 10px; margin-top: -4px;
 }
 .habitchip {
   flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink);
