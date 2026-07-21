@@ -23,7 +23,7 @@ Daycells is licensed under the [MIT License](LICENSE) (Copyright 2026 Alvin Alia
 
 The OAuth **Client ID** identifies the app/project. The **signed-in Google account** owns the Drive file. Two people can share one Client ID and still get separate Drive files if each signs in with their own Gmail.
 
-Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes).
+Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes). After reopen, if Google blocks a quiet reconnect (common on iPhone), Drive pauses until you tap **Reconnect**; local checks keep working.
 
 ## Use
 
@@ -161,7 +161,8 @@ images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 - Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://daycells.vercel.app`).
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
 - Data missing after clearing storage: reconnect Drive or import JSON.
-- Devices diverge: same Google account on both; tap the header sync dot.
+- Devices diverge: same Google account on both; tap the header sync dot (or Reconnect on the banner if Drive sync is paused).
+- Drive sync paused after reopen (common on iPhone): checks still save locally; tap **Reconnect** on the banner or the header sync dot. Google may require a user tap; background reconnect is not always allowed.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
 - No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
 - iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.

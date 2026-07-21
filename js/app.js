@@ -460,14 +460,14 @@
     const s = syncStatus.s;
     if (!enabled) return s === 'off' ? 'off' : s;
     if (s === 'syncing' || s === 'pending') return s;
-    if (s === 'error') return 'error';
-    return 'ok'; // signed in: green, even if a quiet re-auth is needed
+    if (s === 'error' || s === 'auth') return s;
+    return 'ok';
   }
 
   function syncDotTitle() {
     const enabled = Sync.state().enabled;
+    if (enabled && syncStatus.s === 'auth') return syncStatus.detail || 'Tap to re-connect Google Drive';
     if (enabled && (syncStatus.s === 'ok' || syncStatus.s === 'off' || !syncStatus.s)) return 'Connected to Google Drive';
-    if (enabled && syncStatus.s === 'auth') return syncStatus.detail || 'Connected. Tap to refresh Drive sync.';
     return syncStatus.detail || syncStatus.s;
   }
 
@@ -610,6 +610,14 @@
     render();
   }
 
+  function shouldShowReconnectBanner() {
+    if (!Sync.state().enabled) return false;
+    if (syncStatus.s !== 'auth') return false;
+    if (ssGet('dc_reconnect_banner_hide') === '1') return false;
+    if (sampleRemindOpen || sampleWarnOpen || welcomeOpen) return false;
+    return true;
+  }
+
   function shouldShowSigninBanner() {
     if (Sync.state().enabled) return false;
     if (sampleDataActive()) return false;
@@ -626,6 +634,7 @@
 
   function infoBannerKind() {
     if (sampleBannerActive()) return 'sample';
+    if (shouldShowReconnectBanner()) return 'reconnect';
     if (shouldShowSigninBanner()) return 'signin';
     return null;
   }
@@ -638,10 +647,14 @@
       document.body.classList.remove('has-info-banner');
       return;
     }
-    const title = kind === 'sample' ? 'Sample data loaded' : 'Sync across devices';
+    const title = kind === 'sample' ? 'Sample data loaded'
+      : kind === 'reconnect' ? 'Drive sync paused'
+      : 'Sync across devices';
     const body = kind === 'sample'
       ? 'Demo history only. Reset all before tracking your own habits.'
-      : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
+      : kind === 'reconnect'
+        ? 'Checks still save on this device. Tap Reconnect to resume Google Drive.'
+        : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
     const html =
       '<div class="info-banner-text">' +
         '<strong>' + title + '</strong>' +
@@ -649,6 +662,7 @@
       '</div>' +
       '<div class="info-banner-actions">' +
         (kind === 'signin' ? '<button type="button" class="btn" id="banner-settings">Settings</button>' : '') +
+        (kind === 'reconnect' ? '<button type="button" class="btn" id="banner-reconnect">Reconnect</button>' : '') +
         '<button type="button" class="btn ghost" id="banner-hide">Hide</button>' +
       '</div>';
     if (!el) {
@@ -666,6 +680,8 @@
         if (kind === 'sample') {
           hideSampleBanner();
           lsSet('dc_sample_cleared', '1');
+        } else if (kind === 'reconnect') {
+          ssSet('dc_reconnect_banner_hide', '1');
         } else {
           lsSet('dc_signin_banner_seen', '1');
           lsSet('dc_signin_nudge_seen', '1');
@@ -677,6 +693,16 @@
         activeTab = 'settings';
         render();
         window.scrollTo(0, 0);
+      });
+      const recon = el.querySelector('#banner-reconnect');
+      if (recon) recon.addEventListener('click', async () => {
+        try {
+          await Sync.connect();
+          ssDel('dc_reconnect_banner_hide');
+        } catch (e) {
+          alert(e.message || 'Could not reconnect');
+        }
+        render();
       });
     }
     document.body.classList.add('has-info-banner');
@@ -1109,7 +1135,7 @@
           '<button class="btn" id="help-sync">Sync now</button>' +
           '<button class="btn ghost" id="help-disconnect">Sign out</button>' +
         '</div>' +
-        '<p class="mini">If the other device looks stale, open the app there and tap Sync now (or the green/gray dot in the header).</p>' +
+        '<p class="mini">After reopening the app (especially on iPhone), Drive may pause until you tap <b>Reconnect</b> on the banner or the header sync dot. Checks still save on this device meanwhile. If another device looks stale, open the app there and Sync now.</p>' +
         '</div>';
     } else if (configured && GDrive.onHttp()) {
       driveCard =
@@ -1974,10 +2000,18 @@
     gateSampleMod(() => { presetsOpen = true; render(); });
   });
   /* sync dot doubles as a manual sync / reconnect button */
-  $('#syncdot').addEventListener('click', () => {
+  $('#syncdot').addEventListener('click', async () => {
     if (welcomeOpen) return;
     if (!Sync.state().enabled) { activeTab = 'settings'; render(); return; }
-    Sync.fullSync(true).catch(() => {});
+    try {
+      if (syncStatus.s === 'auth' || !GDrive.cachedToken()) {
+        await Sync.connect();
+        ssDel('dc_reconnect_banner_hide');
+      } else {
+        await Sync.fullSync(true);
+      }
+    } catch (e) { /* status already set */ }
+    render();
   });
 
   // ---------- boot ----------
@@ -2008,6 +2042,8 @@
       syncStatus = { s, detail };
       const dot = $('#syncdot');
       if (dot) { dot.className = 'syncdot ' + syncDotClass(); dot.title = syncDotTitle(); }
+      if (s === 'ok' || s === 'off') ssDel('dc_reconnect_banner_hide');
+      renderInfoBanner();
     }
   });
   render();
