@@ -24,14 +24,17 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
-- Tap the check on a card to log today. Tap the date for a calendar jump, or use the arrows for nearby days.
-- **Analytics:** **All** mode shows portfolio momentum, a calendar-year heatmap, and per-habit summary rows. **Focus one** drills into a single habit (streakmap, weekday share, 6-month trend) without leaving the tab.
-- Rest day makes every habit optional without breaking streaks.
-- Streak breaks only on a missed scheduled day. Rest days, off days, and unfinished today carry. Strength (0–100) is an EWMA with a 13-day half-life.
+- **Today:** tap the check to log a day. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked.
+- **Rest day** makes every habit optional that day without breaking streaks.
+- **Notes:** optional note under Today for that day. **See all notes** lists older notes and jumps to that day.
+- **Analytics → All:** portfolio overview (momentum, perfect-day streak, 30-day rate trend, needs attention), calendar-year heatmap (accent colors; shade = share of scheduled habits done), and per-habit strength / 7d / 30d rows.
+- **Analytics → Focus one:** pick one habit via chips. Year heatmap uses that habit’s color (tap a day to edit). Stats, weekday share, and last 6 months sit below. No intensity legend here (cells are done / rest / empty).
+- Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry. Milestone chips (**3d+** / **7d+**, or **2w+** / **4w+** for weekly habits) show on Today and Analytics when you hit them.
+- **Strength** (0–100) is an EWMA (Loop Habit Tracker style): recent days count more (~2-week memory for daily habits). A miss dents it; it does not zero like a streak. Rest days never penalize.
+- Theme: Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
 - Phone: Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone). See [Install](#install-home-screen).
-- Theme: Settings → Appearance (auto / light / dark) and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits year heat uses the accent; Focus one uses each habit's color.
-- In-app **Help**: daily use (cards, calendar, rest day, streaks), Sign in for Drive when a Client ID is ready, export backup. Full Cloud Console steps stay in this README.
-- **Try with sample data:** on first visit (no habits yet), a one-time prompt offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (demo habits; replaces this browser’s data after confirm). After a first-visit sample load, a tip offers **Reset all** or continue. **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
+- In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
+- **Sample data:** first visit (no habits yet) offers **Try sample** or **Skip**. Anytime later: Settings → **Load sample** (~6 months of demo history ending today). After a first-visit sample load, a tip offers **Reset all** or continue. **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then opens the habit picker. Export first if you want a backup.
 
 ## Install (home screen)
 
@@ -134,7 +137,7 @@ scripts/inject-client-id.js  writes config from GOOGLE_CLIENT_ID
 package.json          npm run build → inject
 js/logic.js           dates, schedules, streaks, analytics
 js/store.js           browser persistence
-js/sample.js          first-run sample document (relative to today)
+js/sample.js          first-run sample document (~6 months, relative to today)
 js/gdrive.js          Google Identity Services + Drive
 js/sync.js            merge sync
 sw.js                 service worker (bump VERSION per deploy)

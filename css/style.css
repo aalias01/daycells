@@ -607,6 +607,15 @@ textarea.note {
   width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--card);
   color: var(--ink); padding: 9px 11px; font: inherit; font-size: 13.5px; resize: vertical; min-height: 40px;
 }
+.noteslist { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; max-height: 60dvh; overflow-y: auto; }
+.noterow {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); cursor: pointer;
+}
+.noterow:active { opacity: .85; }
+.noterow .notedate { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+.noterow .notepreview { font-size: 14px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
 
 .presetlist { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 .preset { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; cursor: pointer; }

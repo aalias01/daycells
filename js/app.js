@@ -14,6 +14,7 @@
   let presetsOpen = false;
   let welcomeOpen = false;
   let sampleTipOpen = false;
+  let notesOpen = false;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let analyticsMode = 'all';       // 'all' | 'focus'
@@ -406,6 +407,7 @@
       catch (e) { alert('Local data cleared, but Drive overwrite failed: ' + (e.message || e)); }
     }
     presetsOpen = true;
+    notesOpen = false;
     activeTab = 'today';
     detailId = null;
     editDraft = null;
@@ -433,6 +435,7 @@
     welcomeOpen = false;
     sampleTipOpen = false;
     presetsOpen = false;
+    notesOpen = false;
     activeTab = 'today';
     detailId = null;
     editDraft = null;
@@ -496,7 +499,8 @@
         '</span>' +
       '</div>' +
       cards +
-      '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="One line about this day (optional)">' + esc(Store.getNote(iso)) + '</textarea></div>';
+      '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="Optional note about this day">' + esc(Store.getNote(iso)) + '</textarea>' +
+        '<div class="btnrow" style="margin-top:10px"><button type="button" class="btn ghost" id="seenotes">See all notes</button></div></div>';
 
     $('#view').dataset.day = today;
 
@@ -515,6 +519,7 @@
     }));
     $('#restchip').addEventListener('click', () => { Store.toggleSkip(iso); render(); });
     $('#daynote').addEventListener('change', ev => Store.setNote(iso, ev.target.value));
+    $('#seenotes').addEventListener('click', () => { notesOpen = true; render(); });
     $('#pickday').addEventListener('click', () => {
       calMonth = iso.slice(0, 7);
       calOpen = true;
@@ -693,7 +698,10 @@
       '<div class="card"><h2>' + heatTitle + '</h2>' +
         yearPickerHTML(years, year) +
         yearHeat +
-        '<div class="maplegend">' + heatLegendHTML() + '<br>' + heatLegendNote + '</div></div>' +
+        '<div class="maplegend">' +
+          (analyticsMode === 'all' ? heatLegendHTML() + '<br>' : '') +
+          heatLegendNote +
+        '</div></div>' +
       body;
 
     wireAnalytics(habits);
@@ -742,26 +750,31 @@
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
-          '<li>On <b>Today</b>, tap the <b>checkmark</b> to log it. Cards are compact check rows only.</li>' +
-          '<li><b>Analytics</b> has an <b>All</b> portfolio view and a <b>Focus one</b> mode for a single habit\'s year heat (tap a day to edit), stats, and trends.</li>' +
-          '<li>Forgot a day? Tap the date for a calendar, or use the arrows. Future days are blocked.</li>' +
+          '<li><b>Today</b>: tap the <b>checkmark</b> to log it. Cards are compact check rows. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
-          '<li>Optional: add a one-line <b>note</b> under Today for that day.</li>' +
+          '<li>Optional <b>note</b> under Today for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
         '</ul>' +
-        '<p class="mini">Streaks break only on a missed <em>scheduled</em> day. Rest days, off days, and unfinished today still count as carrying. <b>30-day rate</b> is how often you hit scheduled days in the last 30 days. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory). Streak milestone chips (<b>3d+</b> / <b>7d+</b>, or <b>2w+</b> / <b>4w+</b> for weekly habits) appear on Today and Analytics.</p>' +
-        '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
+      '</div>' +
+      '<div class="card help"><h2>Analytics</h2>' +
+        '<ul>' +
+          '<li><b>All</b>: portfolio overview (momentum, perfect-day streak, 30-day rate vs prior 30 days, habit that needs attention), year heatmap in the accent color, and per-habit strength / 7d / 30d.</li>' +
+          '<li><b>Focus one</b>: switch habits with the chips. Year heatmap uses that habit\'s color; tap a past day to edit. Weekday share and last 6 months sit below.</li>' +
+          '<li>Year chips jump between calendar years when you have history.</li>' +
+        '</ul>' +
+        '<p class="mini"><b>30-day rate</b>: share of scheduled days done in the last 30 days. Trend text uses <b>pp</b> (percentage points). At high rates, no change may read as holding strong. <b>Strength</b> (0–100) is a rolling score that weights recent days more (about a 2-week memory); a miss dents it, it never zeroes like a streak. Rest days never penalize. Milestone chips (<b>3d+</b> / <b>7d+</b>, or <b>2w+</b> / <b>4w+</b> for weekly habits) appear on Today and Analytics.</p>' +
       '</div>' +
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
-          '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one uses each habit\'s color.</li>' +
+          '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one and checks use each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
           '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install StreakGrid</b> when it appears; on iPhone use <b>How to add</b> (Safari Share → Add to Home Screen).</li>' +
         '</ul>' +
+        '<p class="mini">This device already saves everything as you go. You do not need Google for that.</p>' +
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
-        '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore.</p>' +
-        '<p class="mini">First visit: a prompt can load sample habits. Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
+        '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
+        '<p class="mini">First visit: a prompt can load sample habits (~6 months of demo history). Anytime later: Settings → <b>Load sample</b>. Clear with Settings → <b>Reset all</b>. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
 
@@ -874,7 +887,7 @@
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn ghost" id="loadsample">Load sample</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with demo habits. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. <b>Load sample</b> replaces this browser with ~6 months of demo habits. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then opens the habit picker.</div>' +
       '</div>' +
       '<div class="card"><h2>About</h2><div class="mini">StreakGrid is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/streakgrid" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -946,6 +959,7 @@
     if (welcomeOpen) { root.innerHTML = welcomeHTML(); wireWelcome(); return; }
     if (sampleTipOpen) { root.innerHTML = sampleTipHTML(); wireSampleTip(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
+    if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); return; }
     if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
     if (detailId) {
       const h = Store.getHabit(detailId);
@@ -1120,6 +1134,46 @@
     });
   }
 
+  function listedNotes() {
+    const notes = state.notes || {};
+    return Object.keys(notes)
+      .filter(iso => notes[iso] && String(notes[iso].text || '').trim())
+      .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+      .map(iso => ({ iso, text: String(notes[iso].text).trim() }));
+  }
+
+  function notesListHTML() {
+    const rows = listedNotes();
+    const body = rows.length
+      ? '<div class="noteslist">' + rows.map(n => {
+          const nice = Logic.parseDate(n.iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          const preview = n.text.length > 120 ? n.text.slice(0, 117) + '…' : n.text;
+          return '<button type="button" class="noterow" data-note-day="' + n.iso + '">' +
+            '<span class="notedate">' + esc(nice) + '</span>' +
+            '<span class="notepreview">' + esc(preview) + '</span></button>';
+        }).join('') + '</div>'
+      : '<div class="empty" style="padding:24px 8px">No notes yet.</div>';
+    return '<div class="overlay" id="ovl"><div class="sheet"><div class="grab"></div>' +
+      '<div class="dhead"><span class="t"><div class="name">All notes</div>' +
+      '<div class="meta">Tap a note to open that day.</div></span>' +
+      '<button type="button" id="closenotes">✕</button></div>' +
+      body +
+    '</div></div>';
+  }
+
+  function wireNotesList() {
+    $('#closenotes').addEventListener('click', () => { notesOpen = false; render(); });
+    $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') { notesOpen = false; render(); } });
+    document.querySelectorAll('[data-note-day]').forEach(b => b.addEventListener('click', () => {
+      const iso = b.dataset.noteDay;
+      const today = Logic.todayISO();
+      notesOpen = false;
+      activeTab = 'today';
+      viewDate = iso >= today ? null : iso;
+      render();
+    }));
+  }
+
   function detailHTML(h) {
     const today = Logic.todayISO();
     const cur = Logic.currentStreak(h, state.cells, state.skips, today);
@@ -1281,7 +1335,7 @@
     /* Keep sample/welcome sheets open until Try/Skip/Reset — avoids flash when switching tabs. */
     if (welcomeOpen || sampleTipOpen) return;
     activeTab = b.dataset.tab;
-    detailId = null; editDraft = null; presetsOpen = false; mapPage = 0; viewDate = null; calOpen = false;
+    detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
     render();
   });
   $('#fab').addEventListener('click', () => {
