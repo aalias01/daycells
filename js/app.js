@@ -53,7 +53,6 @@
   let sampleWarnPending = null; // fn to run after Skip on modification warning
   let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
-  const SAMPLE_GRACE_MS = 2 * 60 * 1000;
   const SAMPLE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
@@ -481,7 +480,6 @@
     applyTheme();
     hideHeatTip();
     hideHeatDaySheet();
-    armSampleSession();
     if (demoTourStep >= 1 && demoTourStep <= DEMO_TOUR.length) {
       activeTab = DEMO_TOUR[demoTourStep - 1].tab;
     }
@@ -549,7 +547,7 @@
     return lsGet('dc_sample_active') === '1';
   }
 
-  /* Older installs only had the dismissible banner. Promote to durable flag (no first-session grace). */
+  /* Older installs only had the dismissible banner. Promote to durable flag. */
   if (lsGet('dc_sample_banner') === '1' && lsGet('dc_sample_active') !== '1') {
     lsSet('dc_sample_active', '1');
   }
@@ -558,8 +556,9 @@
     lsSet('dc_sample_active', '1');
     lsDel('dc_sample_remind_until');
     ssSet('dc_sample_first_session', '1');
-    ssSet('dc_sample_use_start', String(Date.now()));
+    ssDel('dc_sample_edit_count');
     ssDel('dc_sample_warn_skip');
+    ssDel('dc_sample_use_start');
     ssDel('dc_sample_remind_hide');
     sampleRemindOpen = false;
     sampleWarnOpen = false;
@@ -574,6 +573,7 @@
     lsDel('dc_sample_remind_until');
     hideSampleBanner();
     ssDel('dc_sample_first_session');
+    ssDel('dc_sample_edit_count');
     ssDel('dc_sample_use_start');
     ssDel('dc_sample_warn_skip');
     ssDel('dc_sample_remind_hide');
@@ -706,14 +706,22 @@
     requestAnimationFrame(place);
   }
 
-  function armSampleSession() {
-    if (!sampleDataActive()) return;
-    if (!ssGet('dc_sample_use_start')) ssSet('dc_sample_use_start', String(Date.now()));
-  }
-
   function sampleRemindSnoozed() {
     const until = +(lsGet('dc_sample_remind_until') || 0);
     return !!(until && Date.now() < until);
+  }
+
+  function sampleEditCount() {
+    return Math.max(0, +(ssGet('dc_sample_edit_count') || 0) || 0);
+  }
+
+  function setSampleEditCount(n) {
+    ssSet('dc_sample_edit_count', String(Math.max(0, n | 0)));
+  }
+
+  /** Warn on edit 1, then every 5 edits after that (1, 6, 11, …). */
+  function shouldWarnAtEdit(n) {
+    return n === 1 || (n > 1 && (n - 1) % 5 === 0);
   }
 
   /** Session reminder for later tab sessions (not the tab that just loaded sample). */
@@ -726,27 +734,25 @@
     return true;
   }
 
-  function shouldWarnSample() {
-    if (!sampleDataActive()) return false;
-    if (demoTourStep) return false;
-    if (ssGet('dc_sample_warn_skip') === '1') return false;
-    const first = ssGet('dc_sample_first_session') === '1';
-    const start = +(ssGet('dc_sample_use_start') || 0);
-    if (first && start && (Date.now() - start) < SAMPLE_GRACE_MS) return false;
-    return true;
-  }
-
-  /** Run fn now, or after Skip on the sample modification warning. */
+  /** Run fn now, or after Skip on a sample-edit milestone warning. */
   function gateSampleMod(fn) {
-    armSampleSession();
-    if (!shouldWarnSample()) {
+    if (!sampleDataActive() || demoTourStep) {
       fn();
       return;
     }
-    sampleWarnPending = fn;
-    sampleWarnOpen = true;
-    sampleRemindOpen = false;
-    render();
+    const next = sampleEditCount() + 1;
+    if (shouldWarnAtEdit(next)) {
+      sampleWarnPending = () => {
+        setSampleEditCount(next);
+        fn();
+      };
+      sampleWarnOpen = true;
+      sampleRemindOpen = false;
+      render();
+      return;
+    }
+    setSampleEditCount(next);
+    fn();
   }
 
   function shouldShowReconnectBanner() {
@@ -1336,7 +1342,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner before you start real tracking. Edits after a short explore window will warn you; later visits also remind you.</p>' +
+        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner before you start real tracking. Edits warn on the first change, then every 5 edits after that, until you clear sample. Later visits also remind you.</p>' +
         '<p class="mini">First visit loads demo habits automatically (~6 months of history) and a short tour (Habits → Settings → Analytics). Settings → <b>Reset all</b> reloads the demo. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>';
@@ -1565,7 +1571,7 @@
   function sampleWarnHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Still using sample data</h2>' +
-      '<p>Your changes sit on top of demo history. Reset all to start clean, or Skip to keep exploring this session.</p>' +
+      '<p>Your changes sit on top of demo history. Reset all to start clean, or Skip to keep this change.</p>' +
       '<div class="btnrow">' +
         '<button type="button" class="btn" id="sample-warn-reset">Reset all</button>' +
         '<button type="button" class="btn ghost" id="sample-warn-skip">Skip</button>' +
@@ -1579,7 +1585,6 @@
       doResetAll({ skipConfirm: true });
     });
     $('#sample-warn-skip').addEventListener('click', () => {
-      ssSet('dc_sample_warn_skip', '1');
       const pending = sampleWarnPending;
       sampleWarnPending = null;
       sampleWarnOpen = false;
