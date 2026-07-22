@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v38';
+  window.DC_VERSION = 'dc-v39';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -53,6 +53,7 @@
   let sampleRemindOpen = false;
   let sampleWarnOpen = false;
   let sampleWarnPending = null; // fn to run after Skip on modification warning
+  let sampleWarnKind = 'edit'; // 'edit' | 'addHabit'
   let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
   const SAMPLE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -572,6 +573,7 @@
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     sampleWarnPending = null;
+    sampleWarnKind = 'edit';
     /* Banner waits until after the demo tour (Habits/Settings). */
     lsDel('dc_sample_banner');
     ssSet('dc_sample_banner_pending', '1');
@@ -590,6 +592,7 @@
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     sampleWarnPending = null;
+    sampleWarnKind = 'edit';
     endDemoTour();
   }
 
@@ -771,6 +774,7 @@
         setSampleEditCount(next);
         fn();
       };
+      sampleWarnKind = 'edit';
       sampleWarnOpen = true;
       sampleRemindOpen = false;
       if (feedbackOpen) {
@@ -1371,7 +1375,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner before you start real tracking. Edits warn on the first change, then every 5 edits after that, until you clear sample. Later visits also remind you.</p>' +
+        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner (or when you tap <b>+</b>) before you add your own habits. Edits warn on the first change, then every 5 edits after that, until you clear sample. Later visits also remind you.</p>' +
         '<p class="mini">First visit loads demo habits automatically (~6 months of history) and a short tour (Habits → Settings → Analytics). Settings → <b>Reset all</b> reloads the demo. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>' +
@@ -1650,11 +1654,18 @@
   }
 
   function sampleWarnHTML() {
+    const addHabit = sampleWarnKind === 'addHabit';
+    const body = addHabit
+      ? 'Demo habits are still loaded. Start tracking to clear them and add your own, or Skip to keep exploring the app with sample data.'
+      : 'Your changes sit on top of demo history. Reset all to start clean, or Skip to keep exploring the app with sample data.';
+    const primary = addHabit
+      ? '<button type="button" class="btn" id="sample-warn-reset">Start tracking</button>'
+      : '<button type="button" class="btn" id="sample-warn-reset">Reset all</button>';
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Still using sample data</h2>' +
-      '<p>Your changes sit on top of demo history. Reset all to start clean, or Skip to keep this change.</p>' +
+      '<p>' + body + '</p>' +
       '<div class="btnrow">' +
-        '<button type="button" class="btn" id="sample-warn-reset">Reset all</button>' +
+        primary +
         '<button type="button" class="btn ghost" id="sample-warn-skip">Skip</button>' +
       '</div>' +
     '</div></div>';
@@ -1662,13 +1673,22 @@
 
   function wireSampleWarn() {
     $('#sample-warn-reset').addEventListener('click', () => {
+      const kind = sampleWarnKind;
       sampleWarnPending = null;
-      doResetAll({ skipConfirm: true });
+      sampleWarnOpen = false;
+      sampleWarnKind = 'edit';
+      if (kind === 'addHabit') {
+        doResetAll({ skipConfirm: true, confirmKind: 'startTracking' });
+      } else {
+        doResetAll({ skipConfirm: true });
+      }
     });
     $('#sample-warn-skip').addEventListener('click', () => {
       const pending = sampleWarnPending;
       sampleWarnPending = null;
       sampleWarnOpen = false;
+      sampleWarnKind = 'edit';
+      /* addHabit: dismiss only — never open the habit picker. */
       if (pending) pending();
       else render();
     });
@@ -2325,7 +2345,16 @@
   wireTabSwipe();
   $('#fab').addEventListener('click', () => {
     if (demoTourStep || sampleRemindOpen || sampleWarnOpen || feedbackOpen) return;
-    gateSampleMod(() => { presetsOpen = true; render(); });
+    if (sampleDataActive()) {
+      sampleWarnKind = 'addHabit';
+      sampleWarnPending = null;
+      sampleWarnOpen = true;
+      feedbackOpen = false;
+      render();
+      return;
+    }
+    presetsOpen = true;
+    render();
   });
   const reportBtnEl = $('#reportbtn');
   if (reportBtnEl) reportBtnEl.addEventListener('click', () => openFeedback());
