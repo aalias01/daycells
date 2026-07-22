@@ -239,15 +239,17 @@ header.app .brand-cells {
   font-size: 18px; font-weight: 500; letter-spacing: -0.04em; color: var(--accent-ink);
   margin-left: 1px;
 }
+/* Email + syncdot: size to content, hug the dot; shrink+ellipsis when long. */
 header.app .sub {
   color: var(--muted); font-size: 11.5px; display: flex; align-items: center; gap: 7px;
   font-family: var(--font-mono); justify-content: flex-end;
-  flex: 1 1 auto; min-width: 0; max-width: 11.5rem;
+  flex: 0 1 auto; min-width: 0; max-width: 12rem;
 }
 header.app .sub #subline {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0; flex: 1 1 auto; max-width: 100%;
+  flex: 0 1 auto; min-width: 0; max-width: 100%;
 }
+/* Report + email cluster packs to the right; grows left for longer emails. */
 .header-right {
   display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end;
   flex: 1 1 auto;
@@ -261,7 +263,7 @@ header.app .sub #subline {
 .report-btn .ico { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
 .report-btn .report-lbl { display: inline; }
 @media (min-width: 420px) {
-  header.app .sub { max-width: 14rem; }
+  header.app .sub { max-width: 16rem; }
 }
 .report-btn.hidden { display: none; }
 .syncdot { width: 8px; height: 8px; border-radius: 2px; background: var(--line); display: inline-block; flex: 0 0 auto; }
