@@ -387,7 +387,7 @@ nav.tabs button.tab-nudge {
 .gridmini .c.future { visibility: hidden; }
 
 /* detail overlay */
-.overlay { position: fixed; inset: 0; background: rgba(18, 22, 29, .5); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.overlay { position: fixed; inset: 0; background: rgba(18, 22, 29, .5); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
 .sheet {
   background: var(--bg); width: 100%; max-width: 640px; max-height: 92dvh; overflow-y: auto;
   border-radius: 16px 16px 0 0; padding: 14px 14px calc(20px + env(safe-area-inset-bottom));

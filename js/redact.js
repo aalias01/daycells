@@ -36,7 +36,7 @@ window.Redact = (() => {
     const root = document.createElement('div');
     root.className = 'redact-overlay';
     root.innerHTML =
-      '<div class="redact-banner">Cover anything private (names, amounts, emails) before sending.</div>' +
+      '<div class="redact-banner">Cover personal details (names, amounts, emails) before sending.</div>' +
       '<div class="redact-stage"><canvas id="redact-canvas"></canvas></div>' +
       '<div class="redact-toolbar">' +
         '<button type="button" class="btn ghost" id="redact-undo">Undo</button>' +

@@ -160,7 +160,7 @@ images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 
 ## Feedback (tester reports)
 
-When `DISCORD_WEBHOOK_URL` is set on Vercel, the live app shows a **Report** button. Testers send a short note (optional screenshot; they can cover private areas first). Reports land in your Discord channel via `/api/feedback` (webhook stays server-side).
+When `DISCORD_WEBHOOK_URL` is set on Vercel, the live app shows a **Report** button. Testers send a short note (optional screenshot; they can cover personal details first). Reports land in your Discord channel via `/api/feedback` (webhook stays server-side).
 
 1. Discord → your private server → channel → Edit channel → Integrations → Webhooks → New Webhook → Copy URL.
 2. Vercel → Project → Settings → Environment Variables:

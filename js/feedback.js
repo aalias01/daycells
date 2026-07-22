@@ -319,7 +319,7 @@ window.Feedback = (() => {
       '<div class="btnrow">' +
         (draft.blob ? '' : '<button type="button" class="btn ghost" id="fb-shot">Add screenshot</button>') +
       '</div>' +
-      '<p class="mini">On iPhone: take a screenshot first (Side + Volume Up), then choose it here. You can cover private areas before sending.</p>' +
+      '<p class="mini">On iPhone: take a screenshot first (Side + Volume Up), then choose it here. You can cover personal details before sending.</p>' +
       '<details class="fb-meta"' + (draft.metaOpen ? ' open' : '') + '>' +
         '<summary>Details attached automatically</summary>' +
         '<pre class="fb-meta-pre">' + esc(metaLines(meta)) + '</pre>' +

@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v37';
+  window.DC_VERSION = 'dc-v38';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -564,6 +564,7 @@
     lsSet('dc_sample_active', '1');
     lsDel('dc_sample_remind_until');
     ssSet('dc_sample_first_session', '1');
+    lsDel('dc_sample_edit_count');
     ssDel('dc_sample_edit_count');
     ssDel('dc_sample_warn_skip');
     ssDel('dc_sample_use_start');
@@ -581,6 +582,7 @@
     lsDel('dc_sample_remind_until');
     hideSampleBanner();
     ssDel('dc_sample_first_session');
+    lsDel('dc_sample_edit_count');
     ssDel('dc_sample_edit_count');
     ssDel('dc_sample_use_start');
     ssDel('dc_sample_warn_skip');
@@ -720,11 +722,24 @@
   }
 
   function sampleEditCount() {
-    return Math.max(0, +(ssGet('dc_sample_edit_count') || 0) || 0);
+    /* Prefer localStorage so iOS PWA relaunches keep the count (sessionStorage resets). */
+    const raw = lsGet('dc_sample_edit_count');
+    if (raw != null && raw !== '') {
+      return Math.max(0, +(raw) || 0);
+    }
+    const legacy = Math.max(0, +(ssGet('dc_sample_edit_count') || 0) || 0);
+    if (legacy > 0) {
+      lsSet('dc_sample_edit_count', String(legacy));
+      ssDel('dc_sample_edit_count');
+      return legacy;
+    }
+    return 0;
   }
 
   function setSampleEditCount(n) {
-    ssSet('dc_sample_edit_count', String(Math.max(0, n | 0)));
+    const v = String(Math.max(0, n | 0));
+    lsSet('dc_sample_edit_count', v);
+    ssDel('dc_sample_edit_count');
   }
 
   /** Warn on edit 1, then every 5 edits after that (1, 6, 11, …). */
@@ -748,6 +763,8 @@
       fn();
       return;
     }
+    /* Ignore stacked taps while the warn sheet is already open. */
+    if (sampleWarnOpen) return;
     const next = sampleEditCount() + 1;
     if (shouldWarnAtEdit(next)) {
       sampleWarnPending = () => {
@@ -756,6 +773,9 @@
       };
       sampleWarnOpen = true;
       sampleRemindOpen = false;
+      if (feedbackOpen) {
+        feedbackOpen = false;
+      }
       render();
       return;
     }
@@ -787,6 +807,7 @@
 
   function infoBannerKind() {
     if (demoTourStep) return null;
+    if (sampleWarnOpen || sampleRemindOpen) return null;
     if (sampleBannerActive()) return 'sample';
     if (shouldShowReconnectBanner()) return 'reconnect';
     if (shouldShowSigninBanner()) return 'signin';
@@ -1356,7 +1377,7 @@
       '</div>' +
       (window.Feedback && Feedback.enabled()
         ? '<div class="card help"><h2>Send feedback</h2>' +
-          '<p>Found a bug or something confusing? Send a short note (screenshot optional). You can cover private areas before sending.</p>' +
+          '<p>Found a bug or something confusing? Send a short note (screenshot optional). You can cover personal details before sending.</p>' +
           '<div class="btnrow"><button type="button" class="btn" id="help-feedback">Report a problem</button></div>' +
           '</div>'
         : '');
@@ -1478,7 +1499,7 @@
       '</div>' +
       (window.Feedback && Feedback.enabled()
         ? '<div class="card"><h2>Feedback</h2>' +
-          '<p class="mini" style="margin-top:0">Report a bug or something confusing. Screenshot optional; you can cover private areas before sending.</p>' +
+          '<p class="mini" style="margin-top:0">Report a bug or something confusing. Screenshot optional; you can cover personal details before sending.</p>' +
           '<div class="btnrow"><button type="button" class="btn" id="settings-feedback">Report a problem</button></div></div>'
         : '') +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
@@ -1571,6 +1592,9 @@
   // ---------- detail + editor + sample prompts + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
+    /* Sample warn/remind beat feedback so a stuck Report sheet cannot hide them. */
+    if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
+    if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
     if (feedbackOpen && window.Feedback) {
       /* Don't remount while typing; Sync status renders would reset the caret. */
       if (!root.querySelector('.feedbacksheet')) {
@@ -1584,8 +1608,6 @@
       }
       return;
     }
-    if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
-    if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
     if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
     if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); return; }
@@ -2275,7 +2297,7 @@
     main.addEventListener('touchstart', ev => {
       if (tabSlideBusy || ev.touches.length !== 1 || sheetOpen()) { tracking = false; return; }
       const t = ev.target;
-      if (t.closest && t.closest('.yearheatmap-scroll, .drag-handle, input, textarea, select')) {
+      if (t.closest && t.closest('.yearheatmap-scroll, .drag-handle, .check, .habitmain, input, textarea, select')) {
         tracking = false;
         return;
       }
