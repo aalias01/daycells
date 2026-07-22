@@ -48,6 +48,7 @@
   let pendingCustoms = []; // staged custom drafts for this picker session (index 0 = newest)
   let presetCheckState = null; // null = starter defaults; else Set of checked preset indices
   let customCheckState = null; // Set of checked pending-custom indices
+  let suppressedPresetIndices = new Set(); // stock rows hidden after edit-this-session
   let editorFromPresets = false; // editor opened from Create my own / re-edit pending
   let editingPendingIndex = null; // null = new custom; number = re-editing pendingCustoms[i]
   let editingPresetIndex = null; // null = not editing a stock preset; else PRESETS index
@@ -1829,6 +1830,7 @@
     pendingCustoms = [];
     presetCheckState = null;
     customCheckState = null;
+    suppressedPresetIndices = new Set();
     editorFromPresets = false;
     editingPendingIndex = null;
     editingPresetIndex = null;
@@ -1912,6 +1914,7 @@
         '<button type="button" class="preset-edit" data-edit-custom="' + i + '" aria-label="Edit">✎</button></label>';
     }).join('');
     const presetRows = PRESETS.map((p, i) => {
+      if (suppressedPresetIndices.has(i)) return '';
       if (takenNames.has(p.name.toLowerCase())) return '';
       const checked = presetCheckState
         ? presetCheckState.has(i)
@@ -1923,12 +1926,12 @@
         '<span class="psch">' + esc(scheduleLabel(p)) + '</span>' +
         '<button type="button" class="preset-edit" data-edit-preset="' + i + '" aria-label="Edit">✎</button></label>';
     }).join('');
-    return '<div class="overlay" id="ovl"><div class="sheet"><div class="grab"></div>' +
+    return '<div class="overlay" id="ovl"><div class="sheet presetsheet"><div class="grab"></div>' +
       '<div class="dhead"><span class="t"><div class="name">Add habits</div>' +
       '<div class="meta">Start with 1 to 3. Edit a row to change schedule before adding.</div></span>' +
       '<button id="closepresets">✕</button></div>' +
       '<div class="presetlist">' + customRows + presetRows + '</div>' +
-      '<div class="btnrow"><button class="btn" id="addpresets">Add selected</button>' +
+      '<div class="btnrow sheetfoot"><button class="btn" id="addpresets">Add selected</button>' +
       '<button class="btn ghost" id="customhabit">Create my own</button></div>' +
     '</div></div>';
   }
@@ -2221,6 +2224,7 @@
         } else {
           const fromPreset = editingPresetIndex;
           pendingCustoms.unshift(clonePendingFields(fields));
+          if (fromPreset != null) suppressedPresetIndices.add(fromPreset);
           if (customCheckState) {
             const next = new Set([...customCheckState].map(i => i + 1));
             next.add(0);
