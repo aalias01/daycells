@@ -243,9 +243,10 @@ header.app .sub {
   color: var(--muted); font-size: 11.5px; display: flex; align-items: center; gap: 7px;
   font-family: var(--font-mono); max-width: none; justify-content: flex-end;
 }
-header.app .sub #subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28vw; }
+header.app .sub #subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22vw; }
 .header-right {
   display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end;
+  flex: 1 1 auto;
 }
 .report-btn {
   display: inline-flex; align-items: center; gap: 5px;
@@ -254,9 +255,8 @@ header.app .sub #subline { overflow: hidden; text-overflow: ellipsis; white-spac
   font-family: var(--font); flex: 0 0 auto; cursor: pointer;
 }
 .report-btn .ico { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
-.report-btn .report-lbl { display: none; }
+.report-btn .report-lbl { display: inline; }
 @media (min-width: 420px) {
-  .report-btn .report-lbl { display: inline; }
   header.app .sub #subline { max-width: 36vw; }
 }
 .report-btn.hidden { display: none; }
