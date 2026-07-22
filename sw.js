@@ -2,7 +2,7 @@
  * Strategy: stale-while-revalidate for same-origin GETs. Bump VERSION to
  * force-refresh cached assets after a deploy.
  */
-const VERSION = 'dc-v33';
+const VERSION = 'dc-v34';
 const PRECACHE = [
   './',
   'index.html',
@@ -13,6 +13,8 @@ const PRECACHE = [
   'js/sample.js',
   'js/gdrive.js',
   'js/sync.js',
+  'js/redact.js',
+  'js/feedback.js',
   'js/app.js',
   'manifest.webmanifest',
   'icons/icon-192.png',

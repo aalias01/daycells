@@ -1,11 +1,14 @@
 /* Daycells deployment config.
- * Committed copy keeps googleClientId empty so public forks do not inherit
- * a project Client ID. The live deploy sets GOOGLE_CLIENT_ID on Vercel;
- * scripts/inject-client-id.js writes it into this file at build time.
- * Override per browser: Settings → Advanced, or leave empty and paste there.
- * The ID is origin-restricted and, in OAuth Testing mode, limited to listed
- * test users; it is still not a password. App works fully local-only when empty.
+ * Committed copy keeps secrets empty so public forks do not inherit them.
+ * The live deploy sets GOOGLE_CLIENT_ID / DISCORD_WEBHOOK_URL / FEEDBACK_MAILTO
+ * on Vercel; scripts/inject-client-id.js writes client fields into this file at build.
+ * When DISCORD_WEBHOOK_URL is set, feedbackEndpoint becomes "/api/feedback".
+ * Override Client ID per browser: Settings → Advanced.
+ * feedbackEndpoint set → Report UI shown; empty → hidden.
+ * feedbackMailto → optional mailto: fallback recipient when Discord send fails.
  */
 window.DC_CONFIG = {
-  googleClientId: ""
+  googleClientId: "",
+  feedbackEndpoint: "",
+  feedbackMailto: ""
 };

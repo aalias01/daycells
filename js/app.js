@@ -1,6 +1,8 @@
 /* Daycells UI. Vanilla JS, no framework (house rule). */
 (() => {
   'use strict';
+  /* Keep in sync with VERSION in sw.js (bump both on deploy). */
+  window.DC_VERSION = 'dc-v34';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -62,6 +64,7 @@
   let viewDate = null;   // Habits tab date; null = live today (so midnight rolls over)
   let calOpen = false;   // custom themed date picker
   let calMonth = null;   // 'YYYY-MM' while calendar is open
+  let feedbackOpen = false;
   let clientIdAdvanced = false;
   let clientIdReveal = false;
   let deferredInstall = null; // beforeinstallprompt event
@@ -483,7 +486,7 @@
     if (demoTourStep >= 1 && demoTourStep <= DEMO_TOUR.length) {
       activeTab = DEMO_TOUR[demoTourStep - 1].tab;
     }
-    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId && !demoTourStep) {
+    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId && !demoTourStep && !feedbackOpen) {
       sampleRemindOpen = true;
     }
     const y = window.scrollY; // keep scroll position across re-renders
@@ -495,6 +498,11 @@
     dot.className = 'syncdot ' + syncDotClass();
     dot.title = syncDotTitle();
     $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
+    const reportBtn = $('#reportbtn');
+    if (reportBtn) {
+      const showReport = !!(window.Feedback && Feedback.enabled());
+      reportBtn.classList.toggle('hidden', !showReport);
+    }
     if (activeTab === 'settings' && shouldShowSigninBanner()) {
       signinBtnNudge = true;
     }
@@ -1345,7 +1353,13 @@
         '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner before you start real tracking. Edits warn on the first change, then every 5 edits after that, until you clear sample. Later visits also remind you.</p>' +
         '<p class="mini">First visit loads demo habits automatically (~6 months of history) and a short tour (Habits → Settings → Analytics). Settings → <b>Reset all</b> reloads the demo. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
-      '</div>';
+      '</div>' +
+      (window.Feedback && Feedback.enabled()
+        ? '<div class="card help"><h2>Send feedback</h2>' +
+          '<p>Found a bug or something confusing? Send a short note (screenshot optional). You can cover private areas before sending.</p>' +
+          '<div class="btnrow"><button type="button" class="btn" id="help-feedback">Report a problem</button></div>' +
+          '</div>'
+        : '');
 
     const connect = $('#help-connect');
     if (connect) connect.addEventListener('click', async () => {
@@ -1360,6 +1374,8 @@
     if (toSet) toSet.addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
     const toSet2 = $('#helptosettings2');
     if (toSet2) toSet2.addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
+    const helpFb = $('#help-feedback');
+    if (helpFb) helpFb.addEventListener('click', () => openFeedback());
   }
 
   // ---------- Settings ----------
@@ -1460,6 +1476,11 @@
         '<button class="btn danger" id="reset">Reset all</button></div>' +
         '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use the banner <b>Start tracking</b> before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again.</div>' +
       '</div>' +
+      (window.Feedback && Feedback.enabled()
+        ? '<div class="card"><h2>Feedback</h2>' +
+          '<p class="mini" style="margin-top:0">Report a bug or something confusing. Screenshot optional; you can cover private areas before sending.</p>' +
+          '<div class="btnrow"><button type="button" class="btn" id="settings-feedback">Report a problem</button></div></div>'
+        : '') +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
     const cn = $('#connect');
@@ -1520,11 +1541,49 @@
     });
     $('#importjson').addEventListener('click', () => $('#importfile').click());
     $('#reset').addEventListener('click', () => { doResetAll({ reseedDemo: true }); });
+    const settingsFb = $('#settings-feedback');
+    if (settingsFb) settingsFb.addEventListener('click', () => openFeedback());
+  }
+
+  function openFeedback() {
+    if (!window.Feedback || !Feedback.enabled()) return;
+    if (demoTourStep || sampleRemindOpen || sampleWarnOpen) return;
+    feedbackOpen = true;
+    /* close competing sheets */
+    editDraft = null;
+    presetsOpen = false;
+    notesOpen = false;
+    calOpen = false;
+    detailId = null;
+    const st = Sync.state();
+    Feedback.open({
+      screen: activeTab,
+      viewDate: viewDate || Logic.todayISO(),
+      syncEnabled: !!st.enabled,
+      sampleLoaded: sampleDataActive(),
+      prefillEmail: (st.enabled && st.email) ? st.email : ''
+    }, () => {
+      feedbackOpen = false;
+      render();
+    });
   }
 
   // ---------- detail + editor + sample prompts + calendar modals ----------
   function renderModal() {
     const root = $('#modal');
+    if (feedbackOpen && window.Feedback) {
+      /* Don't remount while typing; Sync status renders would reset the caret. */
+      if (!root.querySelector('.feedbacksheet')) {
+        Feedback.mount(root, {
+          screen: activeTab,
+          viewDate: viewDate || Logic.todayISO(),
+          syncEnabled: !!Sync.state().enabled,
+          sampleLoaded: sampleDataActive(),
+          prefillEmail: (Sync.state().enabled && Sync.state().email) ? Sync.state().email : ''
+        });
+      }
+      return;
+    }
     if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
     if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
     if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
@@ -2209,7 +2268,7 @@
 
     function sheetOpen() {
       return !!(document.querySelector('.overlay') || document.getElementById('heat-day-ovl') ||
-        sampleRemindOpen || sampleWarnOpen || demoTourStep ||
+        sampleRemindOpen || sampleWarnOpen || demoTourStep || feedbackOpen ||
         presetsOpen || notesOpen || calOpen || editDraft || detailId);
     }
 
@@ -2243,9 +2302,11 @@
   }
   wireTabSwipe();
   $('#fab').addEventListener('click', () => {
-    if (demoTourStep || sampleRemindOpen || sampleWarnOpen) return;
+    if (demoTourStep || sampleRemindOpen || sampleWarnOpen || feedbackOpen) return;
     gateSampleMod(() => { presetsOpen = true; render(); });
   });
+  const reportBtnEl = $('#reportbtn');
+  if (reportBtnEl) reportBtnEl.addEventListener('click', () => openFeedback());
   /* sync dot doubles as a manual sync / reconnect button */
   $('#syncdot').addEventListener('click', async () => {
     if (demoTourStep) return;

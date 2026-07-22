@@ -1,28 +1,41 @@
 #!/usr/bin/env node
 /**
- * Vercel (or local) build step: optionally inject GOOGLE_CLIENT_ID into
- * js/config.js. The committed file stays empty so public forks never copy
- * your Client ID. Runs on Vercel's build machines; does not need to dirty
- * your local working tree when you deploy with `vercel --prod`.
+ * Vercel (or local) build step: inject deploy env into js/config.js.
+ * Committed file stays empty so public forks never copy secrets.
+ * Env vars (all optional):
+ *   GOOGLE_CLIENT_ID     — Google OAuth Web Client ID
+ *   DISCORD_WEBHOOK_URL  — server-only Discord webhook (also used by /api/feedback).
+ *                          When set, client feedbackEndpoint becomes "/api/feedback".
+ *   FEEDBACK_ENDPOINT    — override client endpoint (e.g. direct webhook for local tests)
+ *   FEEDBACK_MAILTO      — email for mailto fallback when send fails
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const id = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+const discord = String(process.env.DISCORD_WEBHOOK_URL || '').trim();
+const explicit = String(process.env.FEEDBACK_ENDPOINT || '').trim();
+const feedback = explicit || (discord ? '/api/feedback' : '');
+const mailto = String(process.env.FEEDBACK_MAILTO || '').trim();
 const out = path.join(__dirname, '..', 'js', 'config.js');
 
 const body =
   '/* Daycells deployment config.\n' +
-  ' * Committed copy keeps googleClientId empty. At deploy, scripts/inject-client-id.js\n' +
-  ' * may fill this from the GOOGLE_CLIENT_ID env var (Vercel Production).\n' +
-  ' * Forks: leave empty, or set your own env / paste in Settings.\n' +
+  ' * Committed copy keeps secrets empty. At deploy, scripts/inject-client-id.js\n' +
+  ' * may fill this from GOOGLE_CLIENT_ID / DISCORD_WEBHOOK_URL / FEEDBACK_*.\n' +
+  ' * Forks: leave empty, or set your own env / paste Client ID in Settings.\n' +
   ' */\n' +
   'window.DC_CONFIG = {\n' +
-  '  googleClientId: ' + JSON.stringify(id) + '\n' +
+  '  googleClientId: ' + JSON.stringify(id) + ',\n' +
+  '  feedbackEndpoint: ' + JSON.stringify(feedback) + ',\n' +
+  '  feedbackMailto: ' + JSON.stringify(mailto) + '\n' +
   '};\n';
 
 fs.writeFileSync(out, body);
-console.log(id
-  ? 'inject-client-id: wrote googleClientId from GOOGLE_CLIENT_ID'
-  : 'inject-client-id: GOOGLE_CLIENT_ID unset; wrote empty googleClientId');
+const parts = [];
+parts.push(id ? 'googleClientId set' : 'googleClientId empty');
+parts.push(feedback ? ('feedbackEndpoint=' + feedback) : 'feedbackEndpoint empty');
+parts.push(mailto ? 'feedbackMailto set' : 'feedbackMailto empty');
+parts.push(discord ? 'DISCORD_WEBHOOK_URL present (server)' : 'DISCORD_WEBHOOK_URL unset');
+console.log('inject-client-id: ' + parts.join('; '));

@@ -241,9 +241,25 @@ header.app .brand-cells {
 }
 header.app .sub {
   color: var(--muted); font-size: 11.5px; display: flex; align-items: center; gap: 7px;
-  font-family: var(--font-mono); max-width: 55%; justify-content: flex-end;
+  font-family: var(--font-mono); max-width: none; justify-content: flex-end;
 }
-header.app .sub #subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header.app .sub #subline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 28vw; }
+.header-right {
+  display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end;
+}
+.report-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 9px; padding: 5px 9px; font-size: 12px; font-weight: 500;
+  font-family: var(--font); flex: 0 0 auto; cursor: pointer;
+}
+.report-btn .ico { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+.report-btn .report-lbl { display: none; }
+@media (min-width: 420px) {
+  .report-btn .report-lbl { display: inline; }
+  header.app .sub #subline { max-width: 36vw; }
+}
+.report-btn.hidden { display: none; }
 .syncdot { width: 8px; height: 8px; border-radius: 2px; background: var(--line); display: inline-block; flex: 0 0 auto; }
 .syncdot.ok { background: var(--accent); }
 .syncdot.pending, .syncdot.syncing { background: var(--warn); }
@@ -834,3 +850,66 @@ button.linkish:active { opacity: .7; }
   margin: 10px 0 0; padding-left: 1.2em; font-size: 13px; line-height: 1.55; color: var(--ink);
 }
 .installsteps li { margin-bottom: 6px; }
+
+/* feedback report sheet */
+.feedbacksheet { max-width: 480px; }
+.feedbacksheet h2 {
+  margin: 0 0 4px; font-family: var(--font-display); font-size: 20px; letter-spacing: -0.03em;
+}
+.fb-label {
+  display: block; margin: 12px 0 5px; font-size: 12px; font-weight: 600; color: var(--muted);
+  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em;
+}
+.fb-opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.fb-text, .fb-input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--card); color: var(--ink); font: 14px/1.45 var(--font);
+}
+.fb-text { resize: vertical; min-height: 88px; }
+.fb-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.fb-chip {
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  border-radius: 999px; padding: 7px 12px; font-size: 12.5px; font-weight: 500;
+}
+.fb-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.fb-thumb-wrap { margin-top: 12px; }
+.fb-thumb {
+  display: block; width: 100%; max-height: 200px; object-fit: contain; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg);
+}
+.fb-meta { margin-top: 12px; font-size: 12px; color: var(--muted); }
+.fb-meta summary { cursor: pointer; font-weight: 500; }
+.fb-meta-pre {
+  margin: 8px 0 0; padding: 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; word-break: break-word; color: var(--ink);
+}
+.fb-status { margin: 12px 0 0; font-size: 13.5px; font-weight: 600; }
+.fb-status.ok { color: var(--accent-ink); }
+.fb-status.err { color: var(--danger); }
+
+/* screenshot redact overlay */
+body.redact-open { overflow: hidden; }
+.redact-overlay {
+  position: fixed; inset: 0; z-index: 80; background: var(--bg);
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+.redact-banner {
+  flex: 0 0 auto; padding: 12px 14px; font-size: 13px; line-height: 1.4;
+  background: color-mix(in srgb, var(--warn) 18%, var(--card));
+  border-bottom: 1px solid var(--line); color: var(--ink);
+}
+.redact-stage {
+  flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
+  padding: 10px; overflow: auto; touch-action: none;
+}
+.redact-stage canvas {
+  max-width: 100%; max-height: 100%; touch-action: none; cursor: crosshair;
+  border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.18);
+}
+.redact-toolbar {
+  flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line); background: var(--card);
+}
+

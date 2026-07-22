@@ -39,7 +39,13 @@
 <div class="shell">
   <header class="app">
     <h1 class="brand"><span class="brand-day">Day</span><span class="brand-cells">cells</span></h1>
-    <span class="sub"><span id="subline">local</span><span class="syncdot" id="syncdot"></span></span>
+    <div class="header-right">
+      <button type="button" class="report-btn hidden" id="reportbtn" aria-label="Report a problem" title="Report a problem">
+        <svg class="ico" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2.5l6.5 12.2H2.5L9 2.5z" fill="none"/><path d="M9 7v3.2"/><circle cx="9" cy="12.2" r="0.7" fill="currentColor" stroke="none"/></svg>
+        <span class="report-lbl">Report</span>
+      </button>
+      <span class="sub"><span id="subline">local</span><span class="syncdot" id="syncdot"></span></span>
+    </div>
   </header>
   <main id="view"></main>
 </div>
@@ -71,6 +77,8 @@
 <script src="js/sample.js"></script>
 <script src="js/gdrive.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/redact.js"></script>
+<script src="js/feedback.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
