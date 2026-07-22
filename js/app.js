@@ -43,6 +43,11 @@
   let detailId = null;   // open habit detail (legacy sheet; Habits no longer opens it)
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
+  let pendingCustoms = []; // staged custom drafts for this picker session (index 0 = newest)
+  let presetCheckState = null; // null = starter defaults; else Set of checked preset indices
+  let customCheckState = null; // Set of checked pending-custom indices
+  let editorFromPresets = false; // editor opened from Create my own / re-edit pending
+  let editingPendingIndex = null; // null = new custom; number = re-editing pendingCustoms[i]
   let sampleRemindOpen = false;
   let sampleWarnOpen = false;
   let sampleWarnPending = null; // fn to run after Skip on modification warning
@@ -631,6 +636,7 @@
     demoTourStep = 1;
     activeTab = 'habits';
     presetsOpen = false;
+    clearPendingPicker();
     sampleRemindOpen = false;
     sampleWarnOpen = false;
     return true;
@@ -877,6 +883,7 @@
     activeTab = 'habits';
     detailId = null;
     editDraft = null;
+    clearPendingPicker();
     calOpen = false;
     mapPage = 0;
     viewDate = null;
@@ -1727,12 +1734,73 @@
   }
 
   // ---------- preset picker ----------
+  function clearPendingPicker() {
+    pendingCustoms = [];
+    presetCheckState = null;
+    customCheckState = null;
+    editorFromPresets = false;
+    editingPendingIndex = null;
+  }
+
+  function snapshotPickerChecks() {
+    presetCheckState = new Set(
+      [...document.querySelectorAll('[data-preset]:checked')].map(cb => +cb.dataset.preset)
+    );
+    customCheckState = new Set(
+      [...document.querySelectorAll('[data-custom]:checked')].map(cb => +cb.dataset.custom)
+    );
+  }
+
+  function closePresets() {
+    presetsOpen = false;
+    clearPendingPicker();
+    render();
+  }
+
+  function clonePendingFields(p) {
+    return {
+      name: p.name,
+      emoji: p.emoji,
+      color: p.color,
+      schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
+    };
+  }
+
+  function openPendingCustom(i) {
+    const p = pendingCustoms[i];
+    if (!p) return;
+    snapshotPickerChecks();
+    editingPendingIndex = i;
+    editorFromPresets = true;
+    presetsOpen = false;
+    gateSampleMod(() => {
+      editDraft = {
+        id: null,
+        name: p.name,
+        emoji: p.emoji,
+        color: p.color,
+        schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
+      };
+      render();
+    });
+  }
+
   function presetsHTML() {
     const existing = new Set(Store.activeHabits().map(h => h.name.toLowerCase()));
     const anyHabits = Store.activeHabits().length > 0;
-    const rows = PRESETS.map((p, i) => {
+    const customRows = pendingCustoms.map((p, i) => {
+      const checked = !customCheckState || customCheckState.has(i);
+      return '<label class="preset">' +
+        '<input type="checkbox" data-custom="' + i + '"' + (checked ? ' checked' : '') + '>' +
+        '<span class="emoji" data-edit-custom="' + i + '" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
+        '<span class="pnm" data-edit-custom="' + i + '">' + esc(p.name) + '</span>' +
+        '<span class="psch" data-edit-custom="' + i + '">' + esc(scheduleLabel(p)) + '</span></label>';
+    }).join('');
+    const presetRows = PRESETS.map((p, i) => {
       const dup = existing.has(p.name.toLowerCase());
-      const checked = !anyHabits && p.starter && !dup;
+      const checked = presetCheckState
+        ? (presetCheckState.has(i) && !dup)
+        : (!anyHabits && p.starter && !dup);
       return '<label class="preset' + (dup ? ' dup' : '') + '">' +
         '<input type="checkbox" data-preset="' + i + '"' + (checked ? ' checked' : '') + (dup ? ' disabled' : '') + '>' +
         '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
@@ -1743,25 +1811,48 @@
       '<div class="dhead"><span class="t"><div class="name">Add habits</div>' +
       '<div class="meta">Start with 1 to 3. Small habits survive; you can add more anytime.</div></span>' +
       '<button id="closepresets">✕</button></div>' +
-      '<div class="presetlist">' + rows + '</div>' +
+      '<div class="presetlist">' + customRows + presetRows + '</div>' +
       '<div class="btnrow"><button class="btn" id="addpresets">Add selected</button>' +
       '<button class="btn ghost" id="customhabit">Create my own</button></div>' +
     '</div></div>';
   }
 
   function wirePresets() {
-    $('#closepresets').addEventListener('click', () => { presetsOpen = false; render(); });
-    $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') { presetsOpen = false; render(); } });
+    $('#closepresets').addEventListener('click', closePresets);
+    $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') closePresets(); });
+    document.querySelectorAll('[data-edit-custom]').forEach(el => {
+      el.addEventListener('click', ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openPendingCustom(+el.dataset.editCustom);
+      });
+    });
     $('#customhabit').addEventListener('click', () => {
+      snapshotPickerChecks();
+      editorFromPresets = true;
+      editingPendingIndex = null;
       presetsOpen = false;
-      openEditor(null);
+      openEditor(null, { fromPresets: true });
     });
     $('#addpresets').addEventListener('click', () => {
       gateSampleMod(() => {
-        const picked = [...document.querySelectorAll('[data-preset]:checked')].map(cb => PRESETS[+cb.dataset.preset]);
-        if (!picked.length) { alert('Tick at least one, or create your own.'); return; }
-        picked.forEach(p => Store.addHabit({ name: p.name, emoji: p.emoji, color: p.color, schedule: JSON.parse(JSON.stringify(p.schedule)) }));
-        presetsOpen = false; render();
+        const pickedCustoms = [...document.querySelectorAll('[data-custom]:checked')]
+          .map(cb => pendingCustoms[+cb.dataset.custom])
+          .filter(Boolean);
+        const pickedPresets = [...document.querySelectorAll('[data-preset]:checked')]
+          .map(cb => PRESETS[+cb.dataset.preset]);
+        if (!pickedCustoms.length && !pickedPresets.length) {
+          alert('Tick at least one, or create your own.');
+          return;
+        }
+        pickedCustoms.forEach(p => Store.addHabit(clonePendingFields(p)));
+        pickedPresets.forEach(p => Store.addHabit({
+          name: p.name, emoji: p.emoji, color: p.color,
+          schedule: JSON.parse(JSON.stringify(p.schedule))
+        }));
+        presetsOpen = false;
+        clearPendingPicker();
+        render();
       });
     });
   }
@@ -1871,7 +1962,12 @@
     if (gf) gf.scrollLeft = gf.scrollWidth;
   }
 
-  function openEditor(id) {
+  function openEditor(id, opts) {
+    const fromPresets = !!(opts && opts.fromPresets);
+    if (!fromPresets) {
+      editorFromPresets = false;
+      editingPendingIndex = null;
+    }
     gateSampleMod(() => {
       const h = id ? Store.getHabit(id) : null;
       editDraft = h
@@ -1884,6 +1980,8 @@
   function editorHTML() {
     const d = editDraft;
     const s = d.schedule;
+    const editingPending = editorFromPresets && editingPendingIndex != null;
+    const isEdit = !!(d.id || editingPending);
     const swatches = Store.PALETTE.map(c =>
       '<button class="sw' + (c === d.color ? ' on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>').join('');
     const quicks = EMOJIS.map(e =>
@@ -1896,7 +1994,7 @@
       schedUI = '<label class="f">Times per week</label><input type="number" id="target" min="1" max="7" value="' + (s.target || 3) + '">';
     }
     return '<div class="overlay" id="ovl"><div class="sheet editor"><div class="grab"></div>' +
-      '<div class="dhead"><span class="t"><div class="name">' + (d.id ? 'Edit habit' : 'New habit') + '</div></span><button id="closeedit">✕</button></div>' +
+      '<div class="dhead"><span class="t"><div class="name">' + (isEdit ? 'Edit habit' : 'New habit') + '</div></span><button id="closeedit">✕</button></div>' +
       '<label class="f">Name</label><input type="text" id="hname" maxlength="40" placeholder="e.g. Morning run" value="' + esc(d.name) + '">' +
       '<label class="f">Icon</label>' +
       '<div class="iconpick">' +
@@ -1909,7 +2007,7 @@
         '<button data-kind="weekdays" class="' + (s.kind === 'weekdays' ? 'on' : '') + '">Weekdays</button>' +
         '<button data-kind="perWeek" class="' + (s.kind === 'perWeek' ? 'on' : '') + '">X per week</button></div>' +
       schedUI +
-      '<div class="btnrow"><button class="btn" id="savehabit">' + (d.id ? 'Save' : 'Add habit') + '</button>' +
+      '<div class="btnrow"><button class="btn" id="savehabit">' + (isEdit ? 'Save' : 'Add habit') + '</button>' +
       '<button class="btn ghost" id="canceledit">Cancel</button>' +
       (d.id ? '<button class="btn danger" id="delhabit">Delete</button>' : '') +
       '</div>' +
@@ -1922,7 +2020,22 @@
     $('#closeedit').addEventListener('click', closeEd);
     $('#canceledit').addEventListener('click', closeEd);
     $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') closeEd(); });
-    function closeEd() { editDraft = null; render(); }
+    function closeEd() {
+      editDraft = null;
+      if (editorFromPresets) {
+        editorFromPresets = false;
+        editingPendingIndex = null;
+        presetsOpen = true;
+      }
+      render();
+    }
+    function returnToPresets() {
+      editDraft = null;
+      editorFromPresets = false;
+      editingPendingIndex = null;
+      presetsOpen = true;
+      render();
+    }
     $('#hname').addEventListener('input', ev => d.name = ev.target.value);
     $('#hname').addEventListener('keydown', ev => { if (ev.key === 'Enter') $('#savehabit').click(); });
     $('#hemoji').addEventListener('input', ev => d.emoji = ev.target.value || '⭐');
@@ -1956,9 +2069,37 @@
       if (!d.name.trim()) { alert('Give the habit a name.'); return; }
       const schedule = normalizeSchedule(d.schedule);
       if (schedule.kind === 'weekdays' && !schedule.days.length) { alert('Pick at least one weekday.'); return; }
-      if (d.id) Store.updateHabit(d.id, { name: d.name.trim(), emoji: d.emoji, color: d.color, schedule });
-      else Store.addHabit({ name: d.name.trim(), emoji: d.emoji, color: d.color, schedule });
-      editDraft = null; render();
+      const fields = { name: d.name.trim(), emoji: d.emoji, color: d.color, schedule };
+      if (d.id) {
+        Store.updateHabit(d.id, fields);
+        editDraft = null;
+        render();
+        return;
+      }
+      if (editorFromPresets) {
+        if (editingPendingIndex != null && pendingCustoms[editingPendingIndex]) {
+          pendingCustoms[editingPendingIndex] = clonePendingFields(fields);
+          if (!customCheckState) {
+            customCheckState = new Set(pendingCustoms.map((_, i) => i));
+          } else {
+            customCheckState.add(editingPendingIndex);
+          }
+        } else {
+          pendingCustoms.unshift(clonePendingFields(fields));
+          if (customCheckState) {
+            const next = new Set([...customCheckState].map(i => i + 1));
+            next.add(0);
+            customCheckState = next;
+          } else {
+            customCheckState = new Set(pendingCustoms.map((_, i) => i));
+          }
+        }
+        returnToPresets();
+        return;
+      }
+      Store.addHabit(fields);
+      editDraft = null;
+      render();
     });
     const del = $('#delhabit');
     if (del) del.addEventListener('click', () => {
@@ -2003,7 +2144,7 @@
     if (!tab || demoTourStep) return;
     if (!allowSame && tab === activeTab) return;
     activeTab = tab;
-    detailId = null; editDraft = null; presetsOpen = false; notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
+    detailId = null; editDraft = null; presetsOpen = false; clearPendingPicker(); notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
     hideHeatTip();
     hideHeatDaySheet();
     render();
