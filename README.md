@@ -27,7 +27,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 
 ## Use
 
-- **+** adds habits (presets or custom). Schedules: every day, weekdays, or N× / week.
+- **+** adds habits (presets or custom). Edit a row (✎) to change schedule before adding. Schedules: every day, weekdays, or N× / week.
 - **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Delete** in the editor (or Settings → Habits) archives the habit; restore or permanently delete under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
@@ -42,7 +42,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
-- **Sample data:** first visit auto-loads demo habits (~6 months of history) and a short spotlight tour (Habits → Settings → Analytics). After the tour, the soft banner appears when you open Habits or Settings; **Start tracking** clears the demo and opens the habit picker (no second confirm). While sample is loaded, **+** always prompts to clear demo first (Skip returns to Habits without the picker). Edits warn on the first change (not during the tour), then every 5 edits after that, until you clear sample. Later sessions also remind you (**Hide** / **Hide for 7 days** / **Reset all**). Google sync nudge stays off until sample is cleared. Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then reloads the demo (and tour). Export first if you want a backup.
+- **Sample data:** first visit auto-loads demo habits (~6 months of history) and a short spotlight tour (Habits → Settings → Analytics). After the tour, the soft banner appears when you open Habits or Settings; **Start tracking** clears the demo and opens the habit picker (no second confirm). While sample is loaded, **+** always prompts to clear demo first (Skip returns to Habits without the picker). Edits warn on the first change (not during the tour), then every 5 edits after that, until you clear sample. Later sessions also remind you (**Hide** / **Reset all**). Google sync nudge stays off until sample is cleared. Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then reloads the demo (and tour). Export first if you want a backup.
 
 ## Install (home screen)
 

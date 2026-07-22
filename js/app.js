@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v40';
+  window.DC_VERSION = 'dc-v41';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -50,13 +50,13 @@
   let customCheckState = null; // Set of checked pending-custom indices
   let editorFromPresets = false; // editor opened from Create my own / re-edit pending
   let editingPendingIndex = null; // null = new custom; number = re-editing pendingCustoms[i]
+  let editingPresetIndex = null; // null = not editing a stock preset; else PRESETS index
   let sampleRemindOpen = false;
   let sampleWarnOpen = false;
   let sampleWarnPending = null; // fn to run after Skip on modification warning
   let sampleWarnKind = 'edit'; // 'edit' | 'addHabit'
   let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
-  const SAMPLE_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
   let signinBtnNudge = false;
   let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
   let analyticsMode = 'all';       // 'all' | 'focus'
@@ -719,11 +719,6 @@
     requestAnimationFrame(place);
   }
 
-  function sampleRemindSnoozed() {
-    const until = +(lsGet('dc_sample_remind_until') || 0);
-    return !!(until && Date.now() < until);
-  }
-
   function sampleEditCount() {
     /* Prefer localStorage so iOS PWA relaunches keep the count (sessionStorage resets). */
     const raw = lsGet('dc_sample_edit_count');
@@ -754,7 +749,6 @@
   function shouldShowSampleRemind() {
     if (!sampleDataActive()) return false;
     if (demoTourStep || sampleWarnOpen) return false;
-    if (sampleRemindSnoozed()) return false;
     if (ssGet('dc_sample_remind_hide') === '1') return false;
     if (ssGet('dc_sample_first_session') === '1') return false;
     return true;
@@ -1349,7 +1343,7 @@
     $('#view').innerHTML =
       '<div class="card help"><h2>Track habits</h2>' +
         '<ul>' +
-          '<li>Tap <b>+</b> to add a habit (presets or your own). Schedules: every day, weekdays, or N× per week.</li>' +
+          '<li>Tap <b>+</b> to add a habit (presets or your own). Use <b>✎</b> on a row to change schedule before adding. Schedules: every day, weekdays, or N× per week.</li>' +
           '<li><b>Habits</b>: tap the <b>checkmark</b> to log it. Tap the habit row (icon or name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional <b>note</b> under Habits for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
@@ -1375,7 +1369,7 @@
       '</div>' +
       '<div class="card help"><h2>Backup without Google</h2>' +
         '<p>Settings → <b>Export JSON</b> before you clear the browser or switch phones. Later use <b>Import JSON</b> to restore. CSV export is a long-format log for spreadsheets.</p>' +
-        '<p class="mini">If sample data is loaded, tap <b>Start tracking</b> on the banner (or when you tap <b>+</b>) before you add your own habits. Edits warn on the first change, then every 5 edits after that, until you clear sample. Later visits also remind you.</p>' +
+        '<p class="mini">If sample data is loaded, use <b>Start tracking</b> (banner, or when you tap <b>+</b>) before you add your own habits. Edits warn on the first change, then every 5 edits after that, until you clear sample.</p>' +
         '<p class="mini">First visit loads demo habits automatically (~6 months of history) and a short tour (Habits → Settings → Analytics). Settings → <b>Reset all</b> reloads the demo. If signed in, Reset also empties the Drive file. Export first if you want a backup.</p>' +
         '<div class="btnrow"><button class="btn ghost" id="helptosettings2">Open Settings</button></div>' +
       '</div>' +
@@ -1499,7 +1493,7 @@
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use the banner <b>Start tracking</b> before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use <b>Start tracking</b> (or <b>+</b>) before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again.</div>' +
       '</div>' +
       (window.Feedback && Feedback.enabled()
         ? '<div class="card"><h2>Feedback</h2>' +
@@ -1626,14 +1620,11 @@
 
   function sampleRemindHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
-      '<h2>Sample data is loaded</h2>' +
-      '<p>This history is demo data. Tap <b>Start tracking</b> on the banner when you are ready for your own habits.</p>' +
+      '<h2>Still using sample data</h2>' +
+      '<p>Your history is still demo data. Reset all to start clean, or Hide to keep exploring the app with sample data.</p>' +
       '<div class="btnrow">' +
         '<button type="button" class="btn" id="sample-remind-reset">Reset all</button>' +
         '<button type="button" class="btn ghost" id="sample-remind-hide">Hide</button>' +
-      '</div>' +
-      '<div class="btnrow" style="margin-top:8px">' +
-        '<button type="button" class="btn ghost" id="sample-remind-snooze">Hide for 7 days</button>' +
       '</div>' +
     '</div></div>';
   }
@@ -1641,12 +1632,6 @@
   function wireSampleRemind() {
     $('#sample-remind-reset').addEventListener('click', () => { doResetAll({ skipConfirm: true }); });
     $('#sample-remind-hide').addEventListener('click', () => {
-      ssSet('dc_sample_remind_hide', '1');
-      sampleRemindOpen = false;
-      render();
-    });
-    $('#sample-remind-snooze').addEventListener('click', () => {
-      lsSet('dc_sample_remind_until', String(Date.now() + SAMPLE_SNOOZE_MS));
       ssSet('dc_sample_remind_hide', '1');
       sampleRemindOpen = false;
       render();
@@ -1846,6 +1831,7 @@
     customCheckState = null;
     editorFromPresets = false;
     editingPendingIndex = null;
+    editingPresetIndex = null;
   }
 
   function snapshotPickerChecks() {
@@ -1877,6 +1863,27 @@
     if (!p) return;
     snapshotPickerChecks();
     editingPendingIndex = i;
+    editingPresetIndex = null;
+    editorFromPresets = true;
+    presetsOpen = false;
+    gateSampleMod(() => {
+      editDraft = {
+        id: null,
+        name: p.name,
+        emoji: p.emoji,
+        color: p.color,
+        schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
+      };
+      render();
+    });
+  }
+
+  function openPresetForEdit(i) {
+    const p = PRESETS[i];
+    if (!p) return;
+    snapshotPickerChecks();
+    editingPendingIndex = null;
+    editingPresetIndex = i;
     editorFromPresets = true;
     presetsOpen = false;
     gateSampleMod(() => {
@@ -1892,30 +1899,33 @@
   }
 
   function presetsHTML() {
-    const existing = new Set(Store.activeHabits().map(h => h.name.toLowerCase()));
+    const takenNames = new Set(Store.activeHabits().map(h => h.name.toLowerCase()));
+    pendingCustoms.forEach(p => takenNames.add(String(p.name || '').toLowerCase()));
     const anyHabits = Store.activeHabits().length > 0;
     const customRows = pendingCustoms.map((p, i) => {
       const checked = !customCheckState || customCheckState.has(i);
       return '<label class="preset">' +
         '<input type="checkbox" data-custom="' + i + '"' + (checked ? ' checked' : '') + '>' +
-        '<span class="emoji" data-edit-custom="' + i + '" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
-        '<span class="pnm" data-edit-custom="' + i + '">' + esc(p.name) + '</span>' +
-        '<span class="psch" data-edit-custom="' + i + '">' + esc(scheduleLabel(p)) + '</span></label>';
+        '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
+        '<span class="pnm">' + esc(p.name) + '</span>' +
+        '<span class="psch">' + esc(scheduleLabel(p)) + '</span>' +
+        '<button type="button" class="preset-edit" data-edit-custom="' + i + '" aria-label="Edit">✎</button></label>';
     }).join('');
     const presetRows = PRESETS.map((p, i) => {
-      const dup = existing.has(p.name.toLowerCase());
+      if (takenNames.has(p.name.toLowerCase())) return '';
       const checked = presetCheckState
-        ? (presetCheckState.has(i) && !dup)
-        : (!anyHabits && p.starter && !dup);
-      return '<label class="preset' + (dup ? ' dup' : '') + '">' +
-        '<input type="checkbox" data-preset="' + i + '"' + (checked ? ' checked' : '') + (dup ? ' disabled' : '') + '>' +
+        ? presetCheckState.has(i)
+        : (!anyHabits && p.starter);
+      return '<label class="preset">' +
+        '<input type="checkbox" data-preset="' + i + '"' + (checked ? ' checked' : '') + '>' +
         '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
-        '<span class="pnm">' + esc(p.name) + (dup ? ' <small>added</small>' : '') + '</span>' +
-        '<span class="psch">' + esc(scheduleLabel(p)) + '</span></label>';
+        '<span class="pnm">' + esc(p.name) + '</span>' +
+        '<span class="psch">' + esc(scheduleLabel(p)) + '</span>' +
+        '<button type="button" class="preset-edit" data-edit-preset="' + i + '" aria-label="Edit">✎</button></label>';
     }).join('');
     return '<div class="overlay" id="ovl"><div class="sheet"><div class="grab"></div>' +
       '<div class="dhead"><span class="t"><div class="name">Add habits</div>' +
-      '<div class="meta">Start with 1 to 3. Small habits survive; you can add more anytime.</div></span>' +
+      '<div class="meta">Start with 1 to 3. Edit a row to change schedule before adding.</div></span>' +
       '<button id="closepresets">✕</button></div>' +
       '<div class="presetlist">' + customRows + presetRows + '</div>' +
       '<div class="btnrow"><button class="btn" id="addpresets">Add selected</button>' +
@@ -1933,10 +1943,18 @@
         openPendingCustom(+el.dataset.editCustom);
       });
     });
+    document.querySelectorAll('[data-edit-preset]').forEach(el => {
+      el.addEventListener('click', ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openPresetForEdit(+el.dataset.editPreset);
+      });
+    });
     $('#customhabit').addEventListener('click', () => {
       snapshotPickerChecks();
       editorFromPresets = true;
       editingPendingIndex = null;
+      editingPresetIndex = null;
       presetsOpen = false;
       openEditor(null, { fromPresets: true });
     });
@@ -2073,6 +2091,7 @@
     if (!fromPresets) {
       editorFromPresets = false;
       editingPendingIndex = null;
+      editingPresetIndex = null;
     }
     gateSampleMod(() => {
       const h = id ? Store.getHabit(id) : null;
@@ -2087,7 +2106,8 @@
     const d = editDraft;
     const s = d.schedule;
     const editingPending = editorFromPresets && editingPendingIndex != null;
-    const isEdit = !!(d.id || editingPending);
+    const editingPreset = editorFromPresets && editingPresetIndex != null;
+    const isEdit = !!(d.id || editingPending || editingPreset);
     const swatches = Store.PALETTE.map(c =>
       '<button class="sw' + (c === d.color ? ' on' : '') + '" data-color="' + c + '" style="background:' + c + '"></button>').join('');
     const quicks = EMOJIS.map(e =>
@@ -2131,6 +2151,7 @@
       if (editorFromPresets) {
         editorFromPresets = false;
         editingPendingIndex = null;
+        editingPresetIndex = null;
         presetsOpen = true;
       }
       render();
@@ -2139,6 +2160,7 @@
       editDraft = null;
       editorFromPresets = false;
       editingPendingIndex = null;
+      editingPresetIndex = null;
       presetsOpen = true;
       render();
     }
@@ -2190,7 +2212,14 @@
           } else {
             customCheckState.add(editingPendingIndex);
           }
+          if (presetCheckState) {
+            const nameKey = fields.name.toLowerCase();
+            PRESETS.forEach((p, i) => {
+              if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
+            });
+          }
         } else {
+          const fromPreset = editingPresetIndex;
           pendingCustoms.unshift(clonePendingFields(fields));
           if (customCheckState) {
             const next = new Set([...customCheckState].map(i => i + 1));
@@ -2198,6 +2227,13 @@
             customCheckState = next;
           } else {
             customCheckState = new Set(pendingCustoms.map((_, i) => i));
+          }
+          if (presetCheckState) {
+            if (fromPreset != null) presetCheckState.delete(fromPreset);
+            const nameKey = fields.name.toLowerCase();
+            PRESETS.forEach((p, i) => {
+              if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
+            });
           }
         }
         returnToPresets();
