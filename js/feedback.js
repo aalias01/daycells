@@ -353,10 +353,12 @@ window.Feedback = (() => {
     };
   }
 
-  function wire(root, meta) {
+  function wire(root, meta, opts) {
     const textEl = root.querySelector('#fb-text');
     if (textEl) {
-      textEl.focus();
+      // Only autofocus on first open — remounts (screenshot, chips, send) must not
+      // yank focus back to the textarea or the phone keyboard pops up again.
+      if (opts && opts.focusText) textEl.focus();
       textEl.addEventListener('input', () => {
         draft.text = textEl.value;
         const send = root.querySelector('#fb-send');
@@ -468,12 +470,12 @@ window.Feedback = (() => {
    * @param {HTMLElement} root
    * @param {object} context from app (screen, viewDate, syncEnabled, sampleLoaded, prefillEmail)
    */
-  function mount(root, context) {
+  function mount(root, context, opts) {
     if (!root) return;
     ctx = context || ctx || {};
     const meta = collectMeta(ctx);
     root.innerHTML = sheetHTML(meta);
-    wire(root, meta);
+    wire(root, meta, opts);
   }
 
   /**
@@ -485,7 +487,7 @@ window.Feedback = (() => {
     onClose = closeCb;
     ctx = context || {};
     resetDraft(ctx.prefillEmail || '');
-    mount(document.getElementById('modal'), ctx);
+    mount(document.getElementById('modal'), ctx, { focusText: true });
   }
 
   function isOpen() {

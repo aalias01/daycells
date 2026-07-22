@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v39';
+  window.DC_VERSION = 'dc-v40';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
