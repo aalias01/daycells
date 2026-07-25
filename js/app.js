@@ -1134,6 +1134,27 @@
     }).join('');
   }
 
+  function setAnalyticsFocusHabit(id) {
+    const y = window.scrollY;
+    analyticsMode = 'focus';
+    analyticsFocusHabitId = id;
+    render();
+    window.scrollTo(0, y);
+    scrollActiveHabitChipIntoView();
+  }
+
+  function scrollActiveHabitChipIntoView() {
+    const row = document.querySelector('.habitchips');
+    const chip = document.querySelector('.habitchip.on');
+    if (!row || !chip) return;
+    const left = chip.offsetLeft;
+    const right = left + chip.offsetWidth;
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 8);
+    else if (right > row.scrollLeft + row.clientWidth) {
+      row.scrollLeft = right - row.clientWidth + 8;
+    }
+  }
+
   function wireAnalytics(habits) {
     document.querySelectorAll('[data-analytics-mode]').forEach(b => b.addEventListener('click', () => {
       analyticsMode = b.dataset.analyticsMode;
@@ -1143,9 +1164,7 @@
       render();
     }));
     document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
-      analyticsMode = 'focus';
-      analyticsFocusHabitId = b.dataset.focusHabit;
-      render();
+      setAnalyticsFocusHabit(b.dataset.focusHabit);
     }));
     document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
       analyticsYear = +b.dataset.year;
@@ -1176,6 +1195,7 @@
     });
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
+    scrollActiveHabitChipIntoView();
     checkStreakCelebrations(habits);
   }
 
@@ -1260,6 +1280,16 @@
             esc(h.emoji) + ' ' + esc(h.name) + '</button>').join('') + '</div>'
       : '';
 
+    const showFocusRail = analyticsMode === 'focus' && habits.length >= 2;
+    const focusRail = showFocusRail
+      ? '<nav class="ana-focus-rail" aria-label="Jump to habit">' + habits.map(h => {
+          const on = h.id === analyticsFocusHabitId;
+          return '<button type="button" class="ana-focus-rail-btn' + (on ? ' on' : '') + '" data-focus-habit="' + h.id + '"' +
+            ' aria-label="' + esc(h.name) + '" title="' + esc(h.name) + '"' +
+            (on ? ' aria-current="true"' : '') + '>' + esc(h.emoji) + '</button>';
+        }).join('') + '</nav>'
+      : '';
+
     let yearHeat, heatTitle, heatLegendNote;
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
@@ -1290,7 +1320,7 @@
         ) + '</div>';
 
     $('#view').innerHTML =
-      '<div id="tour-analytics">' +
+      '<div id="tour-analytics"' + (showFocusRail ? ' class="has-focus-rail"' : '') + '>' +
       '<div class="card"><h2>View</h2>' + modeSeg + focusChips + '</div>' +
       '<div class="ana-break" role="separator"><span>Analytics</span></div>' +
       '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
@@ -1302,7 +1332,8 @@
           heatLegendNote +
         '</div></div>' +
       body +
-      '</div>';
+      '</div>' +
+      focusRail;
 
     wireAnalytics(habits);
   }
