@@ -1305,18 +1305,20 @@
         ) + '</div>';
 
     $('#view').innerHTML =
-      '<div id="tour-analytics" class="has-focus-rail">' +
-      '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
-      '<div class="card"><h2>' + heatTitle + '</h2>' +
-        yearPickerHTML(years, year) +
-        yearHeat +
-        '<div class="maplegend">' +
-          (analyticsMode === 'all' ? heatLegendHTML() + '<br>' : '') +
-          heatLegendNote +
-        '</div></div>' +
-      body +
+      '<div id="tour-analytics" class="ana-layout">' +
+      '<div class="ana-main">' +
+        '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
+        '<div class="card"><h2>' + heatTitle + '</h2>' +
+          yearPickerHTML(years, year) +
+          yearHeat +
+          '<div class="maplegend">' +
+            (analyticsMode === 'all' ? heatLegendHTML() + '<br>' : '') +
+            heatLegendNote +
+          '</div></div>' +
+        body +
       '</div>' +
-      focusRail;
+      '<aside class="ana-rail-col">' + focusRail + '</aside>' +
+      '</div>';
 
     wireAnalytics(habits);
   }

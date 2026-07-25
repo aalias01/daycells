@@ -595,25 +595,22 @@ button.calcell:active { transform: scale(.96); }
 .strengthbar { flex: 0 0 76px; height: 6px; border-radius: 2px; background: var(--cell0); overflow: hidden; }
 .strengthbar i { display: block; height: 100%; }
 
-/* analytics */
-#tour-analytics.has-focus-rail { padding-right: 44px; }
-.ana-focus-rail {
-  position: fixed; z-index: 15;
-  right: 8px;
-  top: calc(64px + env(safe-area-inset-top));
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 6px;
-  border-radius: 8px 0 0 8px;
-  background: color-mix(in srgb, var(--card) 55%, transparent);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 0;
-  border-left: 1px solid var(--line);
-  box-shadow: none;
-  scrollbar-width: none;
+/* analytics: cards column + habit rail column on the same 12px grid */
+.ana-layout { display: flex; align-items: stretch; gap: 12px; }
+.ana-main { flex: 1; min-width: 0; }
+.ana-main > .card:last-child { margin-bottom: 0; }
+.ana-rail-col {
+  flex: 0 0 48px; display: flex; justify-content: center;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
 }
-.ana-focus-rail::-webkit-scrollbar { display: none; }
+/* Centered in the area above the fixed tab bar, clamped inside the rail column. */
+.ana-focus-rail {
+  position: sticky; top: calc(50dvh - 32px); transform: translateY(-50%);
+  align-self: flex-start;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 6px 0;
+}
 .ana-focus-rail-btn {
   width: 36px; height: 36px; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
@@ -634,15 +631,6 @@ button.calcell:active { transform: scale(.96); }
 .ana-rail-sep {
   height: 1px; margin: 2px 4px; flex: 0 0 auto; align-self: stretch;
   background: var(--line);
-}
-/* Mid widths: hug shell edge, keep content inset */
-@media (min-width: 701px) {
-  .ana-focus-rail { right: calc(50% - 320px + 10px); }
-}
-/* Wide: park track in gutter outside the 640px shell; cards regain full width */
-@media (min-width: 780px) {
-  .ana-focus-rail { right: max(12px, calc(50% - 320px - 58px)); }
-  #tour-analytics.has-focus-rail { padding-right: 0; }
 }
 .help-details { margin-top: 10px; }
 .help-details > summary {
