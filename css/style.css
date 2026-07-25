@@ -599,16 +599,18 @@ button.calcell:active { transform: scale(.96); }
 #tour-analytics.has-focus-rail { padding-right: 44px; }
 .ana-focus-rail {
   position: fixed; z-index: 15;
-  right: 8px; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 5px;
-  max-height: calc(100vh - 140px - env(safe-area-inset-bottom));
+  right: 8px;
+  top: calc(64px + env(safe-area-inset-top));
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding: 6px;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border-radius: 8px 0 0 8px;
+  background: color-mix(in srgb, var(--card) 55%, transparent);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  border: 0;
+  border-left: 1px solid var(--line);
+  box-shadow: none;
   scrollbar-width: none;
 }
 .ana-focus-rail::-webkit-scrollbar { display: none; }
@@ -630,11 +632,17 @@ button.calcell:active { transform: scale(.96); }
   stroke: currentColor; fill: none; stroke-width: 1.75;
 }
 .ana-rail-sep {
-  height: 1px; margin: 2px 4px; flex: 0 0 auto;
+  height: 1px; margin: 2px 4px; flex: 0 0 auto; align-self: stretch;
   background: var(--line);
 }
+/* Mid widths: hug shell edge, keep content inset */
 @media (min-width: 701px) {
   .ana-focus-rail { right: calc(50% - 320px + 10px); }
+}
+/* Wide: park track in gutter outside the 640px shell; cards regain full width */
+@media (min-width: 780px) {
+  .ana-focus-rail { right: max(12px, calc(50% - 320px - 58px)); }
+  #tour-analytics.has-focus-rail { padding-right: 0; }
 }
 .help-details { margin-top: 10px; }
 .help-details > summary {
