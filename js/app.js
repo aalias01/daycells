@@ -276,12 +276,16 @@
     const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let lastMonth = -1;
     return cols.map(col => {
-      const day = col.find(c => !c.outside);
-      if (!day) return '';
-      const m = Logic.parseDate(day.iso).getMonth();
-      if (m === lastMonth) return '';
-      lastMonth = m;
-      return names[m];
+      /* Label the first column that contains any day of a new month (not just Monday). */
+      for (let i = 0; i < col.length; i++) {
+        const c = col[i];
+        if (c.outside) continue;
+        const m = Logic.parseDate(c.iso).getMonth();
+        if (m === lastMonth) continue;
+        lastMonth = m;
+        return names[m];
+      }
+      return '';
     });
   }
 
@@ -330,9 +334,10 @@
     const monthRow = '<div class="yearheatmap-months">' + months.map(m =>
       '<span class="monthcol"><span class="monthlbl">' + esc(m) + '</span></span>'
     ).join('') + '</div>';
-    /* Sparse Mon/Wed/Fri labels (GitHub-style); Mon-first rows. Kept outside the
+    /* Sparse Tue/Thu/Sat labels on Mon-first rows (even vertical spacing; GitHub uses
+       Mon/Wed/Fri on a Sun-first grid for the same reason). Kept outside the
        horizontal scroller so they stay visible when the grid centers on today. */
-    const dowLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+    const dowLabels = ['', 'Tue', '', 'Thu', '', 'Sat', ''];
     const dowCol = '<div class="yearheatmap-dows" aria-hidden="true">' + dowLabels.map(d =>
       '<span class="dowlbl">' + (d ? esc(d) : '') + '</span>'
     ).join('') + '</div>';
