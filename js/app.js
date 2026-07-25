@@ -618,7 +618,7 @@
       tab: 'habits',
       target: '#tour-habits',
       title: 'Demo habits',
-      body: 'This is sample history (~6 months). Tap a check to log. Tap the name or icon to edit (sheet on top; you stay here). Nothing here is your real streak yet.'
+      body: 'This is sample history (~6 months). Tap a check to log. Tap a habit\'s name or icon to edit it. Nothing here is your real streak yet.'
     },
     {
       tab: 'settings',
