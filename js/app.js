@@ -628,9 +628,9 @@
     },
     {
       tab: 'analytics',
-      target: '#analyticsseg',
+      target: '#ana-rail',
       title: 'Analytics',
-      body: 'All shows your portfolio across habits. Focus one digs into a single habit. Overview and the year heatmap sit below.'
+      body: 'The top icon is all habits (default). Tap any emoji on the right to dig into one habit. Overview and the year heatmap update beside the rail.'
     }
   ];
 
@@ -1137,37 +1137,20 @@
     }).join('');
   }
 
-  function setAnalyticsFocusHabit(id) {
+  function setAnalyticsView(mode, habitId) {
     const y = window.scrollY;
-    analyticsMode = 'focus';
-    analyticsFocusHabitId = id;
+    analyticsMode = mode;
+    if (mode === 'focus') analyticsFocusHabitId = habitId;
     render();
     window.scrollTo(0, y);
-    scrollActiveHabitChipIntoView();
-  }
-
-  function scrollActiveHabitChipIntoView() {
-    const row = document.querySelector('.habitchips');
-    const chip = document.querySelector('.habitchip.on');
-    if (!row || !chip) return;
-    const left = chip.offsetLeft;
-    const right = left + chip.offsetWidth;
-    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 8);
-    else if (right > row.scrollLeft + row.clientWidth) {
-      row.scrollLeft = right - row.clientWidth + 8;
-    }
   }
 
   function wireAnalytics(habits) {
-    document.querySelectorAll('[data-analytics-mode]').forEach(b => b.addEventListener('click', () => {
-      analyticsMode = b.dataset.analyticsMode;
-      if (analyticsMode === 'focus' && !analyticsFocusHabitId && habits.length) {
-        analyticsFocusHabitId = habits[0].id;
-      }
-      render();
+    document.querySelectorAll('[data-analytics-mode="all"]').forEach(b => b.addEventListener('click', () => {
+      setAnalyticsView('all');
     }));
     document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
-      setAnalyticsFocusHabit(b.dataset.focusHabit);
+      setAnalyticsView('focus', b.dataset.focusHabit);
     }));
     document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
       analyticsYear = +b.dataset.year;
@@ -1198,7 +1181,6 @@
     });
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
-    scrollActiveHabitChipIntoView();
     checkStreakCelebrations(habits);
   }
 
@@ -1272,26 +1254,26 @@
     }
 
     const accent = accentHex();
-    const modeSeg = '<div class="seg analyticsseg" id="analyticsseg">' +
-      '<button type="button" data-analytics-mode="all" class="' + (analyticsMode === 'all' ? 'on' : '') + '">All</button>' +
-      '<button type="button" data-analytics-mode="focus" class="' + (analyticsMode === 'focus' ? 'on' : '') + '">Focus one</button>' +
-    '</div>';
-
-    const focusChips = analyticsMode === 'focus'
-      ? '<div class="habitchips">' + habits.map(h =>
-          '<button type="button" class="habitchip' + (h.id === analyticsFocusHabitId ? ' on' : '') + '" data-focus-habit="' + h.id + '">' +
-            esc(h.emoji) + ' ' + esc(h.name) + '</button>').join('') + '</div>'
-      : '';
-
-    const showFocusRail = analyticsMode === 'focus' && habits.length >= 2;
-    const focusRail = showFocusRail
-      ? '<nav class="ana-focus-rail" aria-label="Jump to habit">' + habits.map(h => {
-          const on = h.id === analyticsFocusHabitId;
+    const allOn = analyticsMode === 'all';
+    const railAllSvg = '<svg class="ana-rail-ico" viewBox="0 0 18 18" aria-hidden="true">' +
+      '<rect x="2" y="2" width="5" height="5" rx="0.5"/>' +
+      '<rect x="11" y="2" width="5" height="5" rx="0.5"/>' +
+      '<rect x="2" y="11" width="5" height="5" rx="0.5"/>' +
+      '<rect x="11" y="11" width="5" height="5" rx="0.5"/>' +
+      '</svg>';
+    const focusRail =
+      '<nav class="ana-focus-rail" id="ana-rail" aria-label="Analytics view">' +
+        '<button type="button" class="ana-focus-rail-btn ana-rail-all' + (allOn ? ' on' : '') + '"' +
+          ' data-analytics-mode="all" aria-label="All habits" title="All habits"' +
+          (allOn ? ' aria-current="true"' : '') + '>' + railAllSvg + '</button>' +
+        '<div class="ana-rail-sep" aria-hidden="true"></div>' +
+        habits.map(h => {
+          const on = !allOn && h.id === analyticsFocusHabitId;
           return '<button type="button" class="ana-focus-rail-btn' + (on ? ' on' : '') + '" data-focus-habit="' + h.id + '"' +
             ' aria-label="' + esc(h.name) + '" title="' + esc(h.name) + '"' +
             (on ? ' aria-current="true"' : '') + '>' + esc(h.emoji) + '</button>';
-        }).join('') + '</nav>'
-      : '';
+        }).join('') +
+      '</nav>';
 
     let yearHeat, heatTitle, heatLegendNote;
     if (analyticsMode === 'focus') {
@@ -1323,9 +1305,7 @@
         ) + '</div>';
 
     $('#view').innerHTML =
-      '<div id="tour-analytics"' + (showFocusRail ? ' class="has-focus-rail"' : '') + '>' +
-      '<div class="card"><h2>View</h2>' + modeSeg + focusChips + '</div>' +
-      '<div class="ana-break" role="separator"><span>Analytics</span></div>' +
+      '<div id="tour-analytics" class="has-focus-rail">' +
       '<div class="card"><h2>Overview</h2>' + overview + '</div>' +
       '<div class="card"><h2>' + heatTitle + '</h2>' +
         yearPickerHTML(years, year) +
@@ -1391,8 +1371,8 @@
       '</div>' +
       '<div class="card help"><h2>Analytics</h2>' +
         '<ul>' +
-          '<li><b>All</b>: portfolio overview across habits, plus per-habit rates. Open <b>About these numbers</b> on each block for definitions.</li>' +
-          '<li><b>Focus one</b>: dig into a single habit.</li>' +
+          '<li>The right rail starts on <b>All</b> (grid icon): portfolio overview across habits, plus per-habit rates. Open <b>About these numbers</b> on each block for definitions.</li>' +
+          '<li>Tap a habit emoji on the rail to dig into that habit alone. Tap the grid icon to return to All.</li>' +
         '</ul>' +
         '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
         '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
@@ -1401,7 +1381,7 @@
       driveCard +
       '<div class="card help"><h2>Phone and look</h2>' +
         '<ul>' +
-          '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; Focus one and checks use each habit\'s color.</li>' +
+          '<li>Settings → <b>Appearance</b>: light/dark mode and accent (Cobalt / Ink / Teal / Fern / Violet / Amber). All-habits heat uses the accent; a single-habit view and checks use each habit\'s color.</li>' +
           '<li>Edit a habit to change its color (emoji tiles, Focus heat, strength bars, and checks).</li>' +
           '<li>Settings → <b>Home screen</b>: on Android/Chrome tap <b>Install Daycells</b> when it appears. On iPhone/iPad (Safari): Share → <b>Add to Home Screen</b> → Add. <b>Share link</b> opens the system share sheet (or copies the URL) so you can send Daycells to someone else.</li>' +
         '</ul>' +
@@ -1524,7 +1504,7 @@
             '<span class="swatch" style="background:' + a.sw + '"></span><span class="alabel">' + a.label + '</span>' +
           '</button>').join('') +
         '</span></div>' +
-        '<div class="mini">Accent paints chrome and the All-habits year heatmap. Focus one uses each habit\'s color (edit a habit to change it).</div>' +
+        '<div class="mini">Accent paints chrome and the All-habits year heatmap. A single-habit view uses each habit\'s color (edit a habit to change it).</div>' +
       '</div>' +
       '</div>' +
       '<div class="card"><h2>Habits</h2><div id="habitlist">' + habitRows + '</div>' + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +

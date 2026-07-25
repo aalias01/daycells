@@ -31,14 +31,13 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Delete** in the editor (or Settings → Habits) archives the habit; restore or permanently delete under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
-- **Analytics → All:** portfolio overview across habits, plus per-habit rates. Open **About these numbers** on each block for definitions.
-- **Analytics → Focus one:** dig into a single habit.
+- **Analytics:** the right rail starts on **All** (grid icon) for a portfolio overview across habits, plus per-habit rates. Tap a habit emoji to dig into that habit; tap the grid to return to All. Open **About these numbers** on each block for definitions.
 - **Year heatmap:** on a phone, scroll to explore (glance only). On a laptop, click a day to open it in Habits.
 - Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
 - **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.
 - **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
 - **Milestone chips:** **3d+** / **7d+** / **21d+** (or **2w+** / **4w+** for weekly habits) on Habits and Analytics when you hit them.
-- Theme: defaults to light. Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; Focus one and checks use each habit’s color.
+- Theme: defaults to light. Settings → Appearance (auto / light / dark) and accent. All-habits year heat uses the accent; a single-habit view and checks use each habit’s color.
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.

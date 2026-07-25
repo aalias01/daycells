@@ -596,17 +596,6 @@ button.calcell:active { transform: scale(.96); }
 .strengthbar i { display: block; height: 100%; }
 
 /* analytics */
-.seg.analyticsseg { margin: 0; max-width: 280px; }
-.habitchips {
-  display: flex; flex-wrap: nowrap; gap: 6px; padding: 12px 0 0; margin: 0;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-}
-.habitchip {
-  flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); color: var(--ink);
-  border-radius: 999px; padding: 6px 11px; font-size: 12px; white-space: nowrap;
-}
-.habitchip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 #tour-analytics.has-focus-rail { padding-right: 44px; }
 .ana-focus-rail {
   position: fixed; z-index: 15;
@@ -636,16 +625,17 @@ button.calcell:active { transform: scale(.96); }
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .ana-focus-rail-btn:active { opacity: .75; }
+.ana-rail-ico {
+  width: 18px; height: 18px; display: block;
+  stroke: currentColor; fill: none; stroke-width: 1.75;
+}
+.ana-rail-sep {
+  height: 1px; margin: 2px 4px; flex: 0 0 auto;
+  background: var(--line);
+}
 @media (min-width: 701px) {
   .ana-focus-rail { right: calc(50% - 320px + 10px); }
 }
-.ana-break {
-  display: flex; align-items: center; gap: 12px; margin: 20px 2px 18px;
-  color: var(--muted); font-size: 11px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
-}
-.ana-break::before,
-.ana-break::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-.ana-break span { flex: 0 0 auto; }
 .help-details { margin-top: 10px; }
 .help-details > summary {
   cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; font-family: var(--font-mono);
