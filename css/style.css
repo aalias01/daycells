@@ -671,11 +671,20 @@ button.calcell:active { transform: scale(.96); }
 .yearheatmap-wrap { margin: 4px 0 2px; }
 .yearheatmap-body { display: flex; align-items: flex-start; gap: 6px; }
 .yearheatmap-dows {
+  display: flex; flex-direction: column;
+  width: 28px; flex: 0 0 28px;
+}
+/* Same band as .yearheatmap-months so DOW rows line up with cell rows. */
+.yearheatmap-dows .dow-spacer {
+  height: 14px; margin-bottom: 4px; flex: 0 0 14px;
+}
+.yearheatmap-dows .dow-rows {
   display: flex; flex-direction: column; gap: 3px;
-  width: 28px; flex: 0 0 28px; padding-top: 18px; /* align under month row */
 }
 .yearheatmap-dows .dowlbl {
-  height: 13px; line-height: 13px; font-size: 10px; color: var(--muted);
+  width: 28px; height: 13px; flex: 0 0 13px;
+  display: flex; align-items: center; justify-content: flex-end;
+  font-size: 10px; line-height: 1; color: var(--muted);
   font-family: var(--font-mono); white-space: nowrap;
 }
 .yearheatmap-scroll {
@@ -683,13 +692,16 @@ button.calcell:active { transform: scale(.96); }
 }
 .yearheatmap-inner { display: inline-flex; flex-direction: column; min-width: min-content; }
 .yearheatmap-months {
-  display: flex; gap: 3px; margin-bottom: 4px; min-height: 14px;
+  display: flex; gap: 3px; margin-bottom: 4px; height: 14px; flex: 0 0 14px;
 }
-.yearheatmap-months .monthcol { width: 13px; flex: 0 0 13px; position: relative; }
+.yearheatmap-months .monthcol { width: 13px; flex: 0 0 13px; height: 14px; position: relative; }
 .yearheatmap-months .monthlbl {
-  position: absolute; left: 0; top: 0; font-size: 10px; color: var(--muted);
+  position: absolute; left: 0; top: 0; bottom: 0;
+  display: flex; align-items: center;
+  font-size: 10px; line-height: 1; color: var(--muted);
   white-space: nowrap; font-family: var(--font-mono);
 }
+.yearheatmap-inner .yeargrid { padding: 0; }
 .yeargrid .c.outside { visibility: hidden; }
 .anafocushead {
   display: flex; align-items: center; gap: 10px; margin-bottom: 10px;

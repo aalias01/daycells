@@ -336,11 +336,14 @@
     ).join('') + '</div>';
     /* Sparse Tue/Thu/Sat labels on Mon-first rows (even vertical spacing; GitHub uses
        Mon/Wed/Fri on a Sun-first grid for the same reason). Kept outside the
-       horizontal scroller so they stay visible when the grid centers on today. */
+       horizontal scroller so they stay visible when the grid centers on today.
+       Spacer mirrors .yearheatmap-months so each label shares a row with its cells. */
     const dowLabels = ['', 'Tue', '', 'Thu', '', 'Sat', ''];
-    const dowCol = '<div class="yearheatmap-dows" aria-hidden="true">' + dowLabels.map(d =>
-      '<span class="dowlbl">' + (d ? esc(d) : '') + '</span>'
-    ).join('') + '</div>';
+    const dowCol = '<div class="yearheatmap-dows" aria-hidden="true">' +
+      '<span class="dow-spacer"></span>' +
+      '<div class="dow-rows">' +
+        dowLabels.map(d => '<span class="dowlbl">' + (d ? esc(d) : '') + '</span>').join('') +
+      '</div></div>';
     const grid = '<div class="gridfull yeargrid">' + cols.map(col =>
       '<div class="col">' + col.map(c => yearHeatCellHTML(c, ink, mode, opts)).join('') + '</div>'
     ).join('') + '</div>';
