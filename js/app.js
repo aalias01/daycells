@@ -790,11 +790,38 @@
     fn();
   }
 
+  /* Reconnect banner: at most once per local calendar day. Hide ends it for today;
+     a successful reconnect clears the day mark so a later auth pause can ask again. */
+  function hideReconnectBannerForToday() {
+    const today = Logic.todayISO();
+    lsSet('dc_reconnect_banner_day', today);
+    ssDel('dc_reconnect_banner_live');
+    ssDel('dc_reconnect_banner_hide');
+  }
+
+  function clearReconnectBannerHide() {
+    lsDel('dc_reconnect_banner_day');
+    ssDel('dc_reconnect_banner_live');
+    ssDel('dc_reconnect_banner_hide');
+  }
+
+  function noteReconnectBannerLive() {
+    lsSet('dc_reconnect_banner_day', Logic.todayISO());
+    ssSet('dc_reconnect_banner_live', '1');
+  }
+
   function shouldShowReconnectBanner() {
     if (!Sync.state().enabled) return false;
     if (syncStatus.s !== 'auth') return false;
-    if (ssGet('dc_reconnect_banner_hide') === '1') return false;
     if (sampleRemindOpen || sampleWarnOpen || demoTourStep) return false;
+    const today = Logic.todayISO();
+    /* Older builds hid for the session only; treat as dismissed for today. */
+    if (ssGet('dc_reconnect_banner_hide') === '1') {
+      hideReconnectBannerForToday();
+      return false;
+    }
+    const day = lsGet('dc_reconnect_banner_day');
+    if (day === today && ssGet('dc_reconnect_banner_live') !== '1') return false;
     return true;
   }
 
@@ -864,7 +891,7 @@
           hideSampleBanner();
           lsSet('dc_sample_cleared', '1');
         } else if (kind === 'reconnect') {
-          ssSet('dc_reconnect_banner_hide', '1');
+          hideReconnectBannerForToday();
         } else {
           lsSet('dc_signin_banner_seen', '1');
           lsSet('dc_signin_nudge_seen', '1');
@@ -885,13 +912,14 @@
       if (recon) recon.addEventListener('click', async () => {
         try {
           await Sync.connect();
-          ssDel('dc_reconnect_banner_hide');
+          clearReconnectBannerHide();
         } catch (e) {
           alert(e.message || 'Could not reconnect');
         }
         render();
       });
     }
+    if (kind === 'reconnect') noteReconnectBannerLive();
     document.body.classList.add('has-info-banner');
   }
 
@@ -2426,7 +2454,7 @@
     try {
       if (syncStatus.s === 'auth' || !GDrive.cachedToken()) {
         await Sync.connect();
-        ssDel('dc_reconnect_banner_hide');
+        clearReconnectBannerHide();
       } else {
         await Sync.fullSync(true);
       }
@@ -2462,7 +2490,7 @@
       syncStatus = { s, detail };
       const dot = $('#syncdot');
       if (dot) { dot.className = 'syncdot ' + syncDotClass(); dot.title = syncDotTitle(); }
-      if (s === 'ok' || s === 'off') ssDel('dc_reconnect_banner_hide');
+      if (s === 'ok' || s === 'off') clearReconnectBannerHide();
       renderInfoBanner();
     }
   });
