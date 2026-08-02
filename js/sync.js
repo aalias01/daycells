@@ -121,7 +121,7 @@ const Sync = (() => {
       }
       const remote = await GDrive.readFile(fileId, wantInteractive).catch(() => ({ version: 2, habits: [], cells: {}, skips: {}, notes: {} }));
       if (adoptRemote && remoteHasData(remote)) {
-        deps.applyDoc(remote);
+        deps.applyDoc(remote, { adoptRemote: true });
         dirtyPending = false;
         done('ok');
         return;

@@ -28,11 +28,11 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 ## Use
 
 - **+** adds habits (presets or custom). Edit a row (✎) to change schedule before adding. Schedules: every day, weekdays, or N× / week.
-- **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Delete** in the editor (or Settings → Habits) archives the habit; restore or permanently delete under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
+- **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Archive** in the editor (or Settings → Habits) hides the habit; restore or **delete forever** under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
-- **Analytics:** the right rail starts on **All** (grid icon) for a portfolio overview across habits, plus per-habit rates. Tap a habit emoji to dig into that habit; tap the grid to return to All. Open **About these numbers** on each block for definitions.
-- **Year heatmap:** on a phone, scroll to explore (glance only). On a laptop, click a day to open it in Habits.
+- **Analytics:** the right rail starts on **All** (grid icon) for a portfolio overview across habits, plus per-habit rates. Tap a habit emoji to dig into that habit (includes a streakmap you can tap to backfill days); tap the grid to return to All. Open **About these numbers** on each block for definitions.
+- **Year heatmap:** on a phone, tap a day for details (then Open in Habits). On a laptop, click a day to open it in Habits.
 - Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
 - **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.
 - **Strength (0–100):** EWMA (Loop Habit Tracker style); recent days count more (~2-week memory). A miss dents it; it does not zero like a streak. Rest days never penalize.
@@ -41,7 +41,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - Settings → **Habits:** drag the grip handle to reorder.
 - Phone: swipe left/right between tabs (page slide); tap the tab bar for an instant switch. Settings → **Home screen** (Install on Android/Chrome; Share steps on iPhone; **Share link** to send the site). See [Install](#install-home-screen).
 - In-app **Help** covers daily use and Sign in. Full Cloud Console steps stay in this README.
-- **Sample data:** first visit auto-loads demo habits (~6 months of history) and a short spotlight tour (Habits → Settings → Analytics). After the tour, the soft banner appears when you open Habits or Settings; **Start tracking** clears the demo and opens the habit picker (no second confirm). While sample is loaded, **+** always prompts to clear demo first (Skip returns to Habits without the picker). Edits warn on the first change (not during the tour), then every 5 edits after that, until you clear sample. Later sessions also remind you (**Hide** / **Reset all**). Google sync nudge stays off until sample is cleared. Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then reloads the demo (and tour). Export first if you want a backup.
+- **Sample data:** first visit auto-loads demo habits (~6 months of history) and a short spotlight tour (Habits → Settings → Analytics). After the tour, the soft banner appears when you open Habits or Settings; **Start tracking** clears the demo and opens the habit picker (asks again if Google Drive is connected, since that also empties the Drive file). While sample is loaded, **+** prompts to clear demo first; **Keep exploring** opens the habit picker on top of the demo. Edits warn on the first change (not during the tour), then every 5 edits after that, until you clear sample. Later sessions also remind you (**Keep exploring** / **Start tracking**). Google sync nudge stays off until sample is cleared. Settings → **Reset all** clears this browser and, if signed in, overwrites the Drive file with empty data, then reloads the demo (and tour). Export first if you want a backup.
 
 ## Install (home screen)
 
@@ -183,8 +183,8 @@ Local without the API: set `FEEDBACK_ENDPOINT` to a webhook URL and run `npm run
   4. Sign in again and **check the Google Drive permission**.
   5. Confirm sync (check a habit or open Drive → `Daycells/daycells-data.json`), then retry **Reset all**.
 - Data missing after clearing storage: reconnect Drive or import JSON.
-- Devices diverge: same Google account on both; tap the header sync dot (or Reconnect on the banner if Drive sync is paused).
-- Drive sync paused after reopen (common on iPhone): checks still save locally; tap **Reconnect** on the banner or the header sync dot. Google may require a user tap; background reconnect is not always allowed.
+- Devices diverge: same Google account on both; tap the header sync control (or Reconnect on the banner if Drive sync is paused).
+- Drive sync paused after reopen (common on iPhone): checks still save locally; tap **Reconnect** on the banner or the header sync control. The banner asks at most once per day; Hide dismisses it for the day. Google may require a user tap; background reconnect is not always allowed.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
 - No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
 - iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.

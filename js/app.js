@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v41';
+  window.DC_VERSION = 'dc-v45';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -42,7 +42,6 @@
   let state = null;
   let activeTab = 'habits';
   let syncStatus = { s: 'off', detail: '' };
-  let detailId = null;   // open habit detail (legacy sheet; Habits no longer opens it)
   let editDraft = null;  // editor modal draft
   let presetsOpen = false;
   let pendingCustoms = []; // staged custom drafts for this picker session (index 0 = newest)
@@ -59,7 +58,8 @@
   let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
   let signinBtnNudge = false;
-  let mapPage = 0;       // detail streakmap paging: 0 = latest 52 weeks
+  let mapPage = 0;       // Analytics focus streakmap paging: 0 = latest 52 weeks
+  let modalFocusKind = null; // last focused modal kind (avoid stealing focus on re-render)
   let analyticsMode = 'all';       // 'all' | 'focus'
   let analyticsFocusHabitId = null;
   let analyticsYear = null;        // null = current calendar year
@@ -71,6 +71,8 @@
   let clientIdReveal = false;
   let deferredInstall = null; // beforeinstallprompt event
   let installHintOpen = false; // iOS / fallback instructions toggle
+  let noteDraft = null; // { iso, text } survives re-renders / Drive merge while typing
+  let noteDraftFocus = false; // restore caret after a mid-edit re-render
 
   function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
@@ -394,11 +396,13 @@
   }
 
   function heatLegendHTML() {
+    /* Match combined heatmap cells (accent alpha ramp), not the unused --heat* tokens. */
+    const ink = accentHex();
     return '<span class="heatswatch" style="background:var(--cell0)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat1)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat2)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat3)"></span>' +
-      '<span class="heatswatch" style="background:var(--heat4)"></span>' +
+      '<span class="heatswatch" style="background:' + hexToRgba(ink, .28) + '"></span>' +
+      '<span class="heatswatch" style="background:' + hexToRgba(ink, .5) + '"></span>' +
+      '<span class="heatswatch" style="background:' + hexToRgba(ink, .75) + '"></span>' +
+      '<span class="heatswatch" style="background:' + hexToRgba(ink, 1) + '"></span>' +
       ' less → more';
   }
 
@@ -481,14 +485,69 @@
     return 'ok';
   }
 
+  function fmtSyncAgo(ts) {
+    if (!ts) return '';
+    const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (sec < 45) return 'just now';
+    if (sec < 3600) return Math.round(sec / 60) + 'm ago';
+    if (sec < 86400) return Math.round(sec / 3600) + 'h ago';
+    return Math.round(sec / 86400) + 'd ago';
+  }
+
   function syncDotTitle() {
-    const enabled = Sync.state().enabled;
+    const st = Sync.state();
+    const enabled = st.enabled;
     if (enabled && syncStatus.s === 'auth') return syncStatus.detail || 'Tap to re-connect Google Drive';
-    if (enabled && (syncStatus.s === 'ok' || syncStatus.s === 'off' || !syncStatus.s)) return 'Connected to Google Drive';
-    return syncStatus.detail || syncStatus.s;
+    if (enabled && syncStatus.s === 'syncing') return 'Syncing with Google Drive…';
+    if (enabled && syncStatus.s === 'pending') return 'Waiting to sync…';
+    if (enabled && syncStatus.s === 'error') return syncStatus.detail || 'Sync error — tap to retry';
+    if (enabled && (syncStatus.s === 'ok' || syncStatus.s === 'off' || !syncStatus.s)) {
+      const ago = fmtSyncAgo(st.lastSync);
+      return ago ? 'Connected · synced ' + ago : 'Connected to Google Drive';
+    }
+    return syncStatus.detail || syncStatus.s || 'Local only — open Settings to sign in';
+  }
+
+  function updateSyncChrome() {
+    const st = Sync.state();
+    const cls = syncDotClass();
+    const dot = $('#syncdot');
+    if (dot) {
+      dot.className = 'syncdot ' + cls;
+    }
+    const ctl = $('#syncctl');
+    if (ctl) {
+      ctl.className = 'syncctl' + (cls === 'auth' ? ' auth' : '');
+      ctl.title = syncDotTitle();
+      ctl.setAttribute('aria-label', syncDotTitle());
+    }
+    const lbl = $('#synclbl');
+    if (lbl) {
+      const showRecon = !!(st.enabled && syncStatus.s === 'auth');
+      lbl.hidden = !showRecon;
+      lbl.textContent = 'Reconnect';
+    }
+    const sub = $('#subline');
+    if (sub) {
+      if (st.enabled && st.email) {
+        const ago = (syncStatus.s === 'ok' || syncStatus.s === 'off' || !syncStatus.s) ? fmtSyncAgo(st.lastSync) : '';
+        sub.textContent = ago ? st.email + ' · ' + ago : st.email;
+      } else {
+        sub.textContent = 'local';
+      }
+    }
+  }
+
+  function reportSaveErrorIfAny() {
+    if (!Store.consumeSaveError) return;
+    const err = Store.consumeSaveError();
+    if (!err) return;
+    alert('Could not save on this device (storage may be full). Export a backup if you can.');
   }
 
   function render() {
+    /* Preserve in-progress note text before #view is rebuilt. */
+    captureNoteDraftFromDom();
     state = Store.get();
     applyTheme();
     hideHeatTip();
@@ -496,7 +555,7 @@
     if (demoTourStep >= 1 && demoTourStep <= DEMO_TOUR.length) {
       activeTab = DEMO_TOUR[demoTourStep - 1].tab;
     }
-    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !detailId && !demoTourStep && !feedbackOpen) {
+    if (shouldShowSampleRemind() && !sampleRemindOpen && !editDraft && !presetsOpen && !notesOpen && !calOpen && !demoTourStep && !feedbackOpen) {
       sampleRemindOpen = true;
     }
     const y = window.scrollY; // keep scroll position across re-renders
@@ -504,10 +563,8 @@
       b.classList.toggle('active', b.dataset.tab === activeTab);
       b.classList.toggle('tab-nudge', b.dataset.tab === 'settings' && shouldShowSigninBanner());
     });
-    const dot = $('#syncdot');
-    dot.className = 'syncdot ' + syncDotClass();
-    dot.title = syncDotTitle();
-    $('#subline').textContent = Sync.state().enabled && Sync.state().email ? Sync.state().email : 'local';
+    updateSyncChrome();
+    reportSaveErrorIfAny();
     const reportBtn = $('#reportbtn');
     if (reportBtn) {
       const showReport = !!(window.Feedback && Feedback.enabled());
@@ -636,7 +693,7 @@
 
   /** Sheets that sit under the tour z-index — hide tour until closed so Next cannot advance underneath. */
   function demoTourPausedBySheet() {
-    return !!(editDraft || presetsOpen || notesOpen || calOpen || detailId || sampleWarnOpen || sampleRemindOpen);
+    return !!(editDraft || presetsOpen || notesOpen || calOpen || sampleWarnOpen || sampleRemindOpen);
   }
 
   function endDemoTour() {
@@ -771,6 +828,12 @@
     }
     /* Ignore stacked taps while the warn sheet is already open. */
     if (sampleWarnOpen) return;
+    /* One grace after Keep exploring from + so Add selected is not a second identical sheet. */
+    if (ssGet('dc_sample_warn_skip') === '1') {
+      ssDel('dc_sample_warn_skip');
+      fn();
+      return;
+    }
     const next = sampleEditCount() + 1;
     if (shouldWarnAtEdit(next)) {
       sampleWarnPending = () => {
@@ -854,6 +917,7 @@
     if (!kind) {
       if (el) el.remove();
       document.body.classList.remove('has-info-banner');
+      document.documentElement.style.removeProperty('--info-banner-h');
       return;
     }
     const title = kind === 'sample' ? 'Sample data loaded'
@@ -921,13 +985,29 @@
     }
     if (kind === 'reconnect') noteReconnectBannerLive();
     document.body.classList.add('has-info-banner');
+    layoutInfoBanner();
+  }
+
+  function layoutInfoBanner() {
+    const ban = document.getElementById('info-banner');
+    if (!ban) {
+      document.documentElement.style.removeProperty('--info-banner-h');
+      return;
+    }
+    requestAnimationFrame(() => {
+      const el = document.getElementById('info-banner');
+      if (!el) return;
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      document.documentElement.style.setProperty('--info-banner-h', Math.max(72, h) + 'px');
+    });
   }
 
   async function doResetAll(opts) {
-    const skipConfirm = !!(opts && opts.skipConfirm);
     const reseedDemo = !!(opts && (opts.reseedDemo || opts.resumeWelcome));
     const startTracking = !!(opts && opts.confirmKind === 'startTracking');
     const connected = Sync.state().enabled;
+    /* Never skip confirm while Drive is connected — wipe would empty the remote file. */
+    const skipConfirm = !!(opts && opts.skipConfirm) && !connected;
     let msg;
     if (startTracking) {
       msg = connected
@@ -949,9 +1029,10 @@
     }
     Store.resetAll();
     clearSampleActive();
+    noteDraft = null;
+    noteDraftFocus = false;
     notesOpen = false;
     activeTab = 'habits';
-    detailId = null;
     editDraft = null;
     clearPendingPicker();
     calOpen = false;
@@ -975,6 +1056,30 @@
     return true;
   }
 
+  function captureNoteDraftFromDom() {
+    const el = document.getElementById('daynote');
+    if (!el) return;
+    const iso = (viewDate || Logic.todayISO());
+    const val = el.value;
+    const stored = Store.getNote(iso);
+    noteDraftFocus = (document.activeElement === el);
+    /* Only keep a draft when the field is dirty. An idle textarea must not
+       re-commit and clobber a note that just arrived from Drive. */
+    if (val === stored) {
+      if (noteDraft && noteDraft.iso === iso) noteDraft = null;
+      return;
+    }
+    noteDraft = { iso, text: val };
+  }
+
+  function commitNoteDraft(isoFilter) {
+    if (!noteDraft) return;
+    if (isoFilter && noteDraft.iso !== isoFilter) return;
+    if (noteDraft.text !== Store.getNote(noteDraft.iso)) {
+      Store.setNote(noteDraft.iso, noteDraft.text);
+    }
+  }
+
   // ---------- Today ----------
   function renderToday() {
     const today = Logic.todayISO();
@@ -983,15 +1088,28 @@
     const rest = Logic.isSkip(state.skips, iso);
     const habits = Store.activeHabits();
     const nice = Logic.parseDate(iso).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    /* Leaving a day: flush the draft for the previous iso before the textarea is rebuilt. */
+    if (noteDraft && noteDraft.iso !== iso) {
+      commitNoteDraft(noteDraft.iso);
+      noteDraft = null;
+      noteDraftFocus = false;
+    }
+    const noteText = (noteDraft && noteDraft.iso === iso) ? noteDraft.text : Store.getNote(iso);
 
-    // day progress: scheduled habits done / due on the viewed day
+    // day progress: required habits + weekly habits still short of their target
     let due = 0, doneCount = 0;
     for (const h of habits) {
       const dn = Logic.isDone(state.cells, iso, h.id);
-      if (dn) { doneCount++; due++; }
-      else if (Logic.isRequired(h, iso, state.skips) && !Logic.isPerWeek(h)) due++;
+      if (dn) { doneCount++; due++; continue; }
+      if (rest) continue; /* rest day: optional; don't inflate the chip */
+      if (Logic.isPerWeek(h)) {
+        const wkDone = Logic.weekDoneCount(h, state.cells, Logic.weekStartOf(iso), iso);
+        if (wkDone < Logic.weekTarget(h)) due++;
+      } else if (Logic.isRequired(h, iso, state.skips)) {
+        due++;
+      }
     }
-    const allDone = due > 0 && doneCount === due;
+    const allDone = !rest && due > 0 && doneCount === due;
 
     let cards = habits.map(h => {
       const done = Logic.isDone(state.cells, iso, h.id);
@@ -1022,8 +1140,8 @@
     $('#view').innerHTML =
       '<div class="todayhead">' +
         '<button type="button" class="date" id="pickday" aria-label="Jump to a date">' + esc(nice) + (isToday ? '' : ' <small class="pastlbl">(past day)</small>') + '</button>' +
-        (due > 0 ? '<span class="chip' + (allDone ? ' on' : '') + '">' + (allDone ? 'All done ✓' : doneCount + '/' + due) + '</span>' : '') +
-        '<span class="chip toggle' + (rest ? ' on' : '') + '" id="restchip" role="button">' + (rest ? '☾ rest day' : 'mark rest day') + '</span>' +
+        (!rest && due > 0 ? '<span class="chip' + (allDone ? ' on' : '') + '">' + (allDone ? 'All done ✓' : doneCount + '/' + due) + '</span>' : '') +
+        '<span class="chip toggle' + (rest ? ' on' : '') + '" id="restchip" role="button" tabindex="0">' + (rest ? '☾ rest day' : 'mark rest day') + '</span>' +
         '<span class="datenav">' +
           '<button id="prevday" aria-label="previous day">‹</button>' +
           '<button id="nextday" aria-label="next day"' + (isToday ? ' disabled' : '') + '>›</button>' +
@@ -1033,7 +1151,7 @@
       '<div id="tour-habits">' +
       cards +
       '</div>' +
-      '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="Optional note about this day">' + esc(Store.getNote(iso)) + '</textarea>' +
+      '<div class="card"><h2>Note</h2><textarea class="note" id="daynote" placeholder="Optional note about this day">' + esc(noteText) + '</textarea>' +
         '<div class="btnrow" style="margin-top:10px"><button type="button" class="btn ghost" id="seenotes">See all notes</button></div></div>';
 
     $('#view').dataset.viewIso = today;
@@ -1057,13 +1175,43 @@
       ev.preventDefault();
       openEditor(b.dataset.editHabit);
     }));
-    $('#restchip').addEventListener('click', () => {
-      gateSampleMod(() => { Store.toggleSkip(iso); render(); });
+    const restChip = $('#restchip');
+    const toggleRest = () => { gateSampleMod(() => { Store.toggleSkip(iso); render(); }); };
+    restChip.addEventListener('click', toggleRest);
+    restChip.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleRest(); }
     });
-    $('#daynote').addEventListener('change', ev => {
-      const val = ev.target.value;
-      gateSampleMod(() => { Store.setNote(iso, val); });
+    /* Notes save freely (dirty-checked). Draft survives Drive merge re-renders. */
+    const noteEl = $('#daynote');
+    let noteTimer = null;
+    const flushNote = () => {
+      clearTimeout(noteTimer);
+      noteTimer = null;
+      if (!noteEl) return;
+      const val = noteEl.value;
+      noteDraft = { iso, text: val };
+      if (val === Store.getNote(iso)) return;
+      Store.setNote(iso, val);
+    };
+    noteEl.addEventListener('input', () => {
+      noteDraft = { iso, text: noteEl.value };
+      noteDraftFocus = true;
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(flushNote, 400);
     });
+    noteEl.addEventListener('blur', () => {
+      noteDraftFocus = false;
+      flushNote();
+    });
+    if (noteDraftFocus && noteDraft && noteDraft.iso === iso) {
+      try {
+        noteEl.focus({ preventScroll: true });
+        const n = noteEl.value.length;
+        noteEl.setSelectionRange(n, n);
+      } catch (e) {
+        try { noteEl.focus(); } catch (e2) {}
+      }
+    }
     $('#seenotes').addEventListener('click', () => { notesOpen = true; render(); });
     $('#pickday').addEventListener('click', () => {
       calMonth = iso.slice(0, 7);
@@ -1106,7 +1254,7 @@
     '</div>' +
     helpDetailsHTML(
       '<p><b>Momentum:</b> average habit strength across active habits (0–100).</p>' +
-      '<p><b>Perfect-day streak:</b> consecutive calendar days where every scheduled habit was done. Rest days do not break it.</p>' +
+      '<p><b>Perfect-day streak:</b> consecutive calendar days where every daily/weekday scheduled habit was done. Weekly-target habits are tracked separately and do not count here. Today stays pending until it is over. Rest days do not break it.</p>' +
       '<p><b>30-day rate:</b> share of scheduled habit-days completed in the last 30 days. Trend vs prior 30 days uses <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
       '<p><b>Needs attention:</b> active habit with the weakest recent strength.</p>'
     );
@@ -1144,11 +1292,24 @@
     const dowMax = Math.max.apply(null, dow.concat([.01]));
     const months = Logic.monthlyCounts(h, state.cells, 6, today);
     const moMax = Math.max.apply(null, months.map(m => m.count).concat([1]));
+    const endISO = Logic.addDays(today, -364 * mapPage);
+    const startISO = Logic.addDays(Logic.weekStartOf(endISO), -7 * 51);
+    const first = Logic.habitStartDate(h, state.cells);
+    const olderExists = first && first < startISO;
+    const rangeLbl = mapPage === 0 ? 'last 52 weeks'
+      : startISO.slice(0, 10) + ' to ' + endISO.slice(0, 10);
     return '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
       '<div class="b"><b>' + Math.round(n * 100) + '%</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>' +
       '<div class="mini">Share of completions on each weekday (not raw counts).</div></div>' +
       '<div class="card"><h2>Last 6 months</h2><div class="bars">' + months.map(m =>
-        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>';
+        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>' +
+      '<div class="card" id="focus-streakmap"><h2>Streakmap · ' + rangeLbl + ' · tap a day to toggle</h2>' +
+        fullMap(h, 52, endISO) +
+        '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span>Full color = done · faint = rest or off day</span>' +
+          '<span><button type="button" class="pagebtn" id="mapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
+          '<button type="button" class="pagebtn" id="mapnewer"' + (mapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
+        '</div></div>';
   }
 
   function renderAnalyticsAllRows(habits, today) {
@@ -1173,11 +1334,52 @@
     window.scrollTo(0, y);
   }
 
+  function jumpHeatDay(iso) {
+    const today = Logic.todayISO();
+    if (!iso || iso > today) return;
+    activeTab = 'habits';
+    viewDate = iso >= today ? null : iso;
+    hideHeatTip();
+    hideHeatDaySheet();
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function showHeatDaySheet(el) {
+    hideHeatDaySheet();
+    const tip = el.getAttribute('data-tip');
+    const iso = el.dataset.jumpDay;
+    if (!tip || !iso) return;
+    el.classList.add('heat-day-active');
+    const ovl = document.createElement('div');
+    ovl.id = 'heat-day-ovl';
+    ovl.className = 'heat-day-ovl';
+    ovl.setAttribute('role', 'presentation');
+    ovl.innerHTML =
+      '<div class="heat-day-sheet" role="dialog" aria-modal="true" aria-label="Day summary">' +
+        '<p>' + esc(tip) + '</p>' +
+        '<div class="btnrow">' +
+          '<button type="button" class="btn" id="heat-day-open">Open in Habits</button>' +
+          '<button type="button" class="btn ghost" id="heat-day-close">Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ovl);
+    const close = () => hideHeatDaySheet();
+    ovl.addEventListener('click', ev => { if (ev.target === ovl) close(); });
+    const closeBtn = ovl.querySelector('#heat-day-close');
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    const openBtn = ovl.querySelector('#heat-day-open');
+    if (openBtn) openBtn.addEventListener('click', () => jumpHeatDay(iso));
+    try { (openBtn || closeBtn).focus(); } catch (e) {}
+  }
+
   function wireAnalytics(habits) {
     document.querySelectorAll('[data-analytics-mode="all"]').forEach(b => b.addEventListener('click', () => {
+      mapPage = 0;
       setAnalyticsView('all');
     }));
     document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
+      mapPage = 0;
       setAnalyticsView('focus', b.dataset.focusHabit);
     }));
     document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
@@ -1186,27 +1388,48 @@
     }));
     const edit = $('#inlineedit');
     if (edit) edit.addEventListener('click', () => openEditor(analyticsFocusHabitId));
+    const direct = heatJumpDirect();
     document.querySelectorAll('#view [data-jump-day]').forEach(c => {
-      if (!heatJumpDirect()) return; /* phone: heatmap is glance-only */
-      const go = () => {
-        const iso = c.dataset.jumpDay;
-        const today = Logic.todayISO();
-        if (!iso || iso > today) return;
-        activeTab = 'habits';
-        viewDate = iso >= today ? null : iso;
-        hideHeatTip();
-        hideHeatDaySheet();
-        render();
-        window.scrollTo(0, 0);
-      };
-      c.addEventListener('click', go);
+      const go = () => jumpHeatDay(c.dataset.jumpDay);
+      if (direct) {
+        c.addEventListener('click', go);
+        c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
+        c.addEventListener('pointermove', ev => moveHeatTip(ev));
+        c.addEventListener('pointerleave', () => hideHeatTip());
+      } else {
+        c.addEventListener('click', () => showHeatDaySheet(c));
+      }
       c.addEventListener('keydown', ev => {
-        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          if (direct) go();
+          else showHeatDaySheet(c);
+        }
       });
-      c.addEventListener('pointerenter', ev => showHeatTip(c, ev));
-      c.addEventListener('pointermove', ev => moveHeatTip(ev));
-      c.addEventListener('pointerleave', () => hideHeatTip());
     });
+    const older = $('#mapolder'), newer = $('#mapnewer');
+    if (older) older.addEventListener('click', () => { mapPage++; render(); });
+    if (newer) newer.addEventListener('click', () => { mapPage = Math.max(0, mapPage - 1); render(); });
+    const focusHabit = analyticsMode === 'focus'
+      ? habits.find(x => x.id === analyticsFocusHabitId)
+      : null;
+    if (focusHabit) {
+      document.querySelectorAll('#focus-streakmap [data-cell]').forEach(c => {
+        c.setAttribute('role', 'button');
+        c.setAttribute('tabindex', '0');
+        const toggle = () => {
+          if (c.dataset.cell > Logic.todayISO()) return;
+          gateSampleMod(() => { Store.toggleCell(c.dataset.cell, focusHabit.id); render(); });
+        };
+        c.addEventListener('click', toggle);
+        c.addEventListener('keydown', ev => {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); }
+        });
+      });
+      const gf = document.querySelector('#focus-streakmap .gridfull');
+      /* Newest weeks are on the right; only auto-scroll when viewing the latest page. */
+      if (gf && mapPage === 0) gf.scrollLeft = gf.scrollWidth;
+    }
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
@@ -1307,18 +1530,18 @@
     if (analyticsMode === 'focus') {
       const h = habits.find(x => x.id === analyticsFocusHabitId);
       const cols = Logic.streakmapCalendarYear(h, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: heatJumpDirect() });
+      yearHeat = yearHeatHTML(cols, habitInk(h), 'habit', { openInHabits: true });
       heatTitle = esc(h.emoji) + ' ' + esc(h.name) + ' · ' + year;
       heatLegendNote = heatJumpDirect()
         ? 'Full color = done · faint = rest or off day · click a day to open in Habits'
-        : 'Full color = done · faint = rest or off day · scroll to explore';
+        : 'Full color = done · faint = rest or off day · tap a day for details';
     } else {
       const cols = Logic.combinedYearHeat(habits, state.cells, state.skips, year, today);
-      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: heatJumpDirect() });
+      yearHeat = yearHeatHTML(cols, accent, 'combined', { openInHabits: true });
       heatTitle = 'All habits · ' + year;
       heatLegendNote = heatJumpDirect()
         ? 'Cell shade = share of scheduled habits completed that day · click a day to open in Habits'
-        : 'Cell shade = share of scheduled habits completed that day · scroll to explore';
+        : 'Cell shade = share of scheduled habits completed that day · tap a day for details';
     }
 
     const overview = analyticsMode === 'focus'
@@ -1365,7 +1588,8 @@
           '<button class="btn" id="help-sync">Sync now</button>' +
           '<button class="btn ghost" id="help-disconnect">Sign out</button>' +
         '</div>' +
-        '<p class="mini">After reopening the app (especially on iPhone), Drive may pause until you tap <b>Reconnect</b> on the banner or the header sync dot. Checks still save on this device meanwhile. If another device looks stale, open the app there and Sync now.</p>' +
+        '<p class="mini">After reopening the app (especially on iPhone), Drive may pause until you tap <b>Reconnect</b> on the banner or the header sync control. Checks still save on this device meanwhile. If another device looks stale, open the app there and Sync now.</p>' +
+        '<p class="mini"><b>Sign out</b> stops syncing on this device. Your Daycells file stays in Google Drive.</p>' +
         '</div>';
     } else if (configured && GDrive.onHttp()) {
       driveCard =
@@ -1395,6 +1619,7 @@
         '<ul>' +
           '<li>Tap <b>+</b> to add a habit (presets or your own). Use <b>✎</b> on a row to change schedule before adding. Schedules: every day, weekdays, or N× per week.</li>' +
           '<li><b>Habits</b>: tap the <b>checkmark</b> to log it. Tap the habit row (icon or name) to edit. Use the date, arrows, or calendar for past days (future days are blocked).</li>' +
+          '<li><b>Archive</b> (Settings or the habit editor) hides a habit without deleting history. Restore it under Settings → <b>Archived</b>, or remove it for good there (asks for confirmation; syncs the removal to Drive).</li>' +
           '<li>Need a break? Tap <b>mark rest day</b> so every habit is optional that day and streaks do not break.</li>' +
           '<li>Optional <b>note</b> under Habits for that day. <b>See all notes</b> lists older notes and jumps to that day.</li>' +
         '</ul>' +
@@ -1402,7 +1627,8 @@
       '<div class="card help"><h2>Analytics</h2>' +
         '<ul>' +
           '<li>The right rail starts on <b>All</b> (grid icon): portfolio overview across habits, plus per-habit rates. Open <b>About these numbers</b> on each block for definitions.</li>' +
-          '<li>Tap a habit emoji on the rail to dig into that habit alone. Tap the grid icon to return to All.</li>' +
+          '<li>Tap a habit emoji on the rail to dig into that habit alone (year heat, weekday mix, and a streakmap you can tap to backfill days). Tap the grid icon to return to All.</li>' +
+          '<li>On a phone, tap a year-heat day for a short summary and <b>Open in Habits</b>. On a laptop, click a day to jump straight there.</li>' +
         '</ul>' +
         '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
         '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
@@ -1438,7 +1664,11 @@
     const syncBtn = $('#help-sync');
     if (syncBtn) syncBtn.addEventListener('click', () => { Sync.fullSync(true).catch(e => alert(e.message)); });
     const disc = $('#help-disconnect');
-    if (disc) disc.addEventListener('click', () => { Sync.disconnect(); render(); });
+    if (disc) disc.addEventListener('click', () => {
+      if (!confirm('Sign out of Google on this device? Your Daycells file stays in Drive.')) return;
+      Sync.disconnect();
+      render();
+    });
     const toSet = $('#helptosettings');
     if (toSet) toSet.addEventListener('click', () => { activeTab = 'settings'; render(); window.scrollTo(0, 0); });
     const toSet2 = $('#helptosettings2');
@@ -1454,12 +1684,13 @@
     const override = (localStorage.getItem('dc_gclient') || '').trim();
     const baked = (((window.DC_CONFIG || {}).googleClientId) || '').trim();
     const configured = GDrive.configured();
-    if (!configured) clientIdAdvanced = true;
 
     const driveBody = st.enabled
       ? '<div class="set-row"><span class="grow">Connected as <b>' + esc(st.email || '?') + '</b></span>' +
-        '<button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disconnect">Disconnect</button></div>' +
-        '<div class="mini">Your data lives in a "Daycells" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).</div>'
+        '<button class="btn ghost" id="syncnow">Sync now</button><button class="btn ghost" id="disconnect">Sign out</button></div>' +
+        '<div class="mini">Your data lives in a "Daycells" folder in your own Google Drive as one JSON file. This app can only see files it created (drive.file scope).' +
+          (st.lastSync ? ' Last synced ' + fmtSyncAgo(st.lastSync) + '.' : '') +
+          ' Sign out stops syncing here; the Drive file stays.</div>'
       : '<div class="set-row"><span class="grow">Store your data in your own Google Drive and sync across devices.</span>' +
         '<button class="btn' + (signinBtnNudge ? ' btn-nudge' : '') + '" id="connect">Sign in with Google</button></div>' +
         (reason ? '<div class="mini">' + esc(reason) + '</div>' : '<div class="mini">Nothing is sent anywhere except your own Drive. Tracking without sign-in still works.</div>');
@@ -1474,7 +1705,7 @@
         '<div class="mini" style="margin-top:8px">Using a Client ID override saved on this device. Sign in above.</div>';
     } else {
       clientBlock =
-        '<div class="mini" style="margin-top:8px">No Client ID yet. Open Advanced to paste one (forks / local), or deploy with <code>GOOGLE_CLIENT_ID</code>.</div>';
+        '<div class="mini" style="margin-top:8px">No Client ID yet. Expand Advanced below Appearance to paste one (forks / local), or deploy with <code>GOOGLE_CLIENT_ID</code>.</div>';
     }
 
     const inputType = clientIdReveal ? 'text' : 'password';
@@ -1499,22 +1730,16 @@
         '<span class="grip" aria-hidden="true"></span></button>' +
       '<span class="grow">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
       '<button class="btn ghost" data-edit="' + h.id + '">edit</button>' +
-      '<button class="btn ghost" data-archive="' + h.id + '">Delete</button></div>').join('') || '<div class="mini">No active habits.</div>';
+      '<button class="btn ghost" data-archive="' + h.id + '">Archive</button></div>').join('') || '<div class="mini">No active habits.</div>';
 
     const archivedRows = Store.archivedHabits().map(h =>
       '<div class="set-row"><span class="grow" style="opacity:.6">' + esc(h.emoji) + ' ' + esc(h.name) + '</span>' +
       '<button class="btn ghost" data-restore="' + h.id + '">restore</button>' +
-      '<button class="btn ghost" data-del="' + h.id + '">delete</button></div>').join('');
+      '<button class="btn ghost" data-del="' + h.id + '">delete forever</button></div>').join('');
 
     $('#view').innerHTML =
       '<div id="tour-settings">' +
-      '<div class="card"><h2>Google Drive sync</h2>' + driveBody +
-        clientBlock +
-        '<button type="button" class="linkish" id="clientidadv" style="margin-top:10px">' +
-          (clientIdAdvanced ? 'Hide Advanced' : 'Advanced: override Client ID') +
-        '</button>' +
-        advancedBody +
-      '</div>' +
+      '<div class="card"><h2>Google Drive sync</h2>' + driveBody + clientBlock + '</div>' +
       installCardHTML() +
       '<div class="card"><h2>Appearance</h2>' +
         '<div class="set-row"><span class="grow">Mode</span><span class="seg" id="themeseg">' +
@@ -1536,14 +1761,21 @@
         '</span></div>' +
         '<div class="mini">Accent paints chrome and the All-habits year heatmap. A single-habit view uses each habit\'s color (edit a habit to change it).</div>' +
       '</div>' +
+      '<div class="card"><h2>Advanced</h2>' +
+        '<button type="button" class="linkish" id="clientidadv">' +
+          (clientIdAdvanced ? 'Hide Client ID override' : 'Override Client ID') +
+        '</button>' +
+        advancedBody +
       '</div>' +
-      '<div class="card"><h2>Habits</h2><div id="habitlist">' + habitRows + '</div>' + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') + '</div>' +
+      '</div>' +
+      '<div class="card"><h2>Habits</h2><div id="habitlist">' + habitRows + '</div>' + (archivedRows ? '<h2 style="margin-top:14px">Archived</h2>' + archivedRows : '') +
+        '<div class="mini">Archive hides a habit from Habits and Analytics. History stays until you delete forever under Archived.</div></div>' +
       '<div class="card"><h2>Data</h2><div class="btnrow">' +
         '<button class="btn" id="exportjson">Export JSON</button>' +
         '<button class="btn ghost" id="exportcsv">Export CSV log</button>' +
         '<button class="btn ghost" id="importjson">Import JSON</button>' +
         '<button class="btn danger" id="reset">Reset all</button></div>' +
-        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use <b>Start tracking</b> (or <b>+</b>) before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again.</div>' +
+        '<div class="mini">This browser holds the working copy. Nothing is pruned. JSON is the full backup; CSV is a long-format log (date, habit, value, timestamp) for pandas or a spreadsheet. If demo data is loaded, use <b>Start tracking</b> (or <b>+</b>) before building your own habit list so you are not logging on top of demo history. <b>Reset all</b> clears this browser; if signed in it also empties the Drive file, then reloads the demo so you can explore again. Import replaces this browser\'s copy; if signed in, the next sync merges with Drive rather than fully replacing it.</div>' +
       '</div>' +
       (window.Feedback && Feedback.enabled()
         ? '<div class="card"><h2>Feedback</h2>' +
@@ -1559,7 +1791,11 @@
     });
     wireInstallCard();
     const dc = $('#disconnect');
-    if (dc) dc.addEventListener('click', () => { Sync.disconnect(); render(); });
+    if (dc) dc.addEventListener('click', () => {
+      if (!confirm('Sign out of Google on this device? Your Daycells file stays in Drive.')) return;
+      Sync.disconnect();
+      render();
+    });
     const sn = $('#syncnow');
     if (sn) sn.addEventListener('click', () => Sync.fullSync(true));
     $('#clientidadv').addEventListener('click', () => { clientIdAdvanced = !clientIdAdvanced; render(); });
@@ -1586,10 +1822,17 @@
     }));
     wireHabitReorder();
     document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openEditor(b.dataset.edit)));
-    document.querySelectorAll('[data-archive]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.archive, { archived: true }); render(); }));
-    document.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => { Store.updateHabit(b.dataset.restore, { archived: false }); render(); }));
+    document.querySelectorAll('[data-archive]').forEach(b => b.addEventListener('click', () => {
+      gateSampleMod(() => { Store.updateHabit(b.dataset.archive, { archived: true }); render(); });
+    }));
+    document.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => {
+      gateSampleMod(() => { Store.updateHabit(b.dataset.restore, { archived: false }); render(); });
+    }));
     document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
-      gateSampleMod(() => { Store.deleteHabit(b.dataset.del); render(); });
+      if (!confirm('Delete this habit forever on this device' + (Sync.state().enabled ? ' and in Google Drive' : '') + '? This cannot be undone.')) return;
+      /* Confirmed destructive action — do not stack the sample warning on top. */
+      Store.deleteHabit(b.dataset.del);
+      render();
     }));
     $('#exportjson').addEventListener('click', () => download('daycells-' + Logic.todayISO() + '.json', Store.exportJSON(), 'application/json'));
     $('#exportcsv').addEventListener('click', () => {
@@ -1608,7 +1851,14 @@
       }
       download('daycells-log-' + Logic.todayISO() + '.csv', lines.join('\n'), 'text/csv');
     });
-    $('#importjson').addEventListener('click', () => $('#importfile').click());
+    $('#importjson').addEventListener('click', () => {
+      const connected = Sync.state().enabled;
+      const msg = connected
+        ? 'Import a backup into this browser? The next Drive sync will merge with your Drive file (it does not fully replace Drive). Export first if you want a safety copy.'
+        : 'Replace habits and checks in this browser with the chosen backup file?';
+      if (!confirm(msg)) return;
+      $('#importfile').click();
+    });
     $('#reset').addEventListener('click', () => { doResetAll({ reseedDemo: true }); });
     const settingsFb = $('#settings-feedback');
     if (settingsFb) settingsFb.addEventListener('click', () => openFeedback());
@@ -1623,7 +1873,6 @@
     presetsOpen = false;
     notesOpen = false;
     calOpen = false;
-    detailId = null;
     const st = Sync.state();
     Feedback.open({
       screen: activeTab,
@@ -1638,11 +1887,36 @@
   }
 
   // ---------- detail + editor + sample prompts + calendar modals ----------
+  function decorateModalA11y(kind) {
+    const sheet = document.querySelector('#modal .sheet');
+    if (!sheet) return;
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    const firstOpen = modalFocusKind !== kind;
+    modalFocusKind = kind;
+    if (!firstOpen) return;
+    let focusable;
+    if (kind === 'editor') {
+      focusable = sheet.querySelector('#hname') || sheet.querySelector('input, textarea, button');
+    } else if (kind === 'sampleWarn' || kind === 'sampleRemind') {
+      /* Prefer the non-destructive action so Enter does not wipe demo data. */
+      focusable = sheet.querySelector('#sample-warn-skip, #sample-remind-hide') ||
+        sheet.querySelector('button');
+    } else {
+      focusable = sheet.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    }
+    if (focusable) {
+      try { focusable.focus({ preventScroll: true }); } catch (e) {
+        try { focusable.focus(); } catch (e2) {}
+      }
+    }
+  }
+
   function renderModal() {
     const root = $('#modal');
     /* Sample warn/remind beat feedback so a stuck Report sheet cannot hide them. */
-    if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); return; }
-    if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); return; }
+    if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); decorateModalA11y('sampleWarn'); return; }
+    if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); decorateModalA11y('sampleRemind'); return; }
     if (feedbackOpen && window.Feedback) {
       /* Don't remount while typing; Sync status renders would reset the caret. */
       if (!root.querySelector('.feedbacksheet')) {
@@ -1653,35 +1927,42 @@
           sampleLoaded: sampleDataActive(),
           prefillEmail: (Sync.state().enabled && Sync.state().email) ? Sync.state().email : ''
         });
+        decorateModalA11y('feedback');
       }
       return;
     }
-    if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); return; }
-    if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); return; }
-    if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); return; }
-    if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); return; }
-    if (detailId) {
-      const h = Store.getHabit(detailId);
-      if (!h || h.deleted) { detailId = null; root.innerHTML = ''; return; }
-      root.innerHTML = detailHTML(h); wireDetail(h); return;
-    }
+    if (editDraft) { root.innerHTML = editorHTML(); wireEditor(); decorateModalA11y('editor'); return; }
+    if (presetsOpen) { root.innerHTML = presetsHTML(); wirePresets(); decorateModalA11y('presets'); return; }
+    if (notesOpen) { root.innerHTML = notesListHTML(); wireNotesList(); decorateModalA11y('notes'); return; }
+    if (calOpen) { root.innerHTML = calendarHTML(); wireCalendar(); decorateModalA11y('calendar'); return; }
+    modalFocusKind = null;
     root.innerHTML = '';
   }
 
   function sampleRemindHTML() {
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Still using sample data</h2>' +
-      '<p>Your history is still demo data. Reset all to start clean, or Hide to keep exploring the app with sample data.</p>' +
+      '<p>Your history is still demo data. Start tracking to clear it and use your own habits, or keep exploring with the sample.</p>' +
       '<div class="btnrow">' +
-        '<button type="button" class="btn" id="sample-remind-reset">Reset all</button>' +
-        '<button type="button" class="btn ghost" id="sample-remind-hide">Hide</button>' +
+        '<button type="button" class="btn" id="sample-remind-reset">Start tracking</button>' +
+        '<button type="button" class="btn ghost" id="sample-remind-hide">Keep exploring</button>' +
       '</div>' +
     '</div></div>';
   }
 
   function wireSampleRemind() {
-    $('#sample-remind-reset').addEventListener('click', () => { doResetAll({ skipConfirm: true }); });
+    $('#sample-remind-reset').addEventListener('click', async () => {
+      const ok = await doResetAll({ skipConfirm: true, confirmKind: 'startTracking' });
+      if (!ok) render();
+    });
     $('#sample-remind-hide').addEventListener('click', () => {
+      ssSet('dc_sample_remind_hide', '1');
+      sampleRemindOpen = false;
+      render();
+    });
+    const ovl = $('#ovl');
+    if (ovl) ovl.addEventListener('click', ev => {
+      if (ev.target.id !== 'ovl') return;
       ssSet('dc_sample_remind_hide', '1');
       sampleRemindOpen = false;
       render();
@@ -1691,41 +1972,55 @@
   function sampleWarnHTML() {
     const addHabit = sampleWarnKind === 'addHabit';
     const body = addHabit
-      ? 'Demo habits are still loaded. Start tracking to clear them and add your own, or Skip to keep exploring the app with sample data.'
-      : 'Your changes sit on top of demo history. Reset all to start clean, or Skip to keep exploring the app with sample data.';
-    const primary = addHabit
-      ? '<button type="button" class="btn" id="sample-warn-reset">Start tracking</button>'
-      : '<button type="button" class="btn" id="sample-warn-reset">Reset all</button>';
+      ? 'Demo habits are still loaded. Start tracking to clear them and add your own, or keep exploring with the sample.'
+      : 'Your changes sit on top of demo history. Start tracking to clear the demo, or keep exploring with the sample.';
     return '<div class="overlay" id="ovl"><div class="sheet welcomesheet"><div class="grab"></div>' +
       '<h2>Still using sample data</h2>' +
       '<p>' + body + '</p>' +
       '<div class="btnrow">' +
-        primary +
-        '<button type="button" class="btn ghost" id="sample-warn-skip">Skip</button>' +
+        '<button type="button" class="btn" id="sample-warn-reset">Start tracking</button>' +
+        '<button type="button" class="btn ghost" id="sample-warn-skip">Keep exploring</button>' +
       '</div>' +
     '</div></div>';
   }
 
   function wireSampleWarn() {
-    $('#sample-warn-reset').addEventListener('click', () => {
+    $('#sample-warn-reset').addEventListener('click', async () => {
+      const pending = sampleWarnPending;
       const kind = sampleWarnKind;
+      /* Clear before reset so a successful doResetAll render does not remount this sheet. */
       sampleWarnPending = null;
       sampleWarnOpen = false;
       sampleWarnKind = 'edit';
-      if (kind === 'addHabit') {
-        doResetAll({ skipConfirm: true, confirmKind: 'startTracking' });
-      } else {
-        doResetAll({ skipConfirm: true });
+      const ok = await doResetAll({ skipConfirm: true, confirmKind: 'startTracking' });
+      if (!ok) {
+        sampleWarnPending = pending;
+        sampleWarnOpen = true;
+        sampleWarnKind = kind;
+        render();
       }
     });
     $('#sample-warn-skip').addEventListener('click', () => {
       const pending = sampleWarnPending;
+      const kind = sampleWarnKind;
       sampleWarnPending = null;
       sampleWarnOpen = false;
       sampleWarnKind = 'edit';
-      /* addHabit: dismiss only — never open the habit picker. */
+      /* From +: Keep exploring opens the picker so the user is not stuck. */
+      if (kind === 'addHabit') {
+        /* Next Add selected should not immediately re-warn (same decision). */
+        ssSet('dc_sample_warn_skip', '1');
+        presetsOpen = true;
+        render();
+        return;
+      }
       if (pending) pending();
-      else render();
+      render();
+    });
+    const ovl = $('#ovl');
+    if (ovl) ovl.addEventListener('click', ev => {
+      if (ev.target.id !== 'ovl') return;
+      $('#sample-warn-skip').click();
     });
   }
 
@@ -1917,16 +2212,14 @@
     editingPresetIndex = null;
     editorFromPresets = true;
     presetsOpen = false;
-    gateSampleMod(() => {
-      editDraft = {
-        id: null,
-        name: p.name,
-        emoji: p.emoji,
-        color: p.color,
-        schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
-      };
-      render();
-    });
+    editDraft = {
+      id: null,
+      name: p.name,
+      emoji: p.emoji,
+      color: p.color,
+      schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
+    };
+    render();
   }
 
   function openPresetForEdit(i) {
@@ -1937,16 +2230,14 @@
     editingPresetIndex = i;
     editorFromPresets = true;
     presetsOpen = false;
-    gateSampleMod(() => {
-      editDraft = {
-        id: null,
-        name: p.name,
-        emoji: p.emoji,
-        color: p.color,
-        schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
-      };
-      render();
-    });
+    editDraft = {
+      id: null,
+      name: p.name,
+      emoji: p.emoji,
+      color: p.color,
+      schedule: normalizeSchedule(JSON.parse(JSON.stringify(p.schedule || { kind: 'daily' })))
+    };
+    render();
   }
 
   function presetsHTML() {
@@ -1957,7 +2248,7 @@
       const checked = !customCheckState || customCheckState.has(i);
       return '<label class="preset">' +
         '<input type="checkbox" data-custom="' + i + '"' + (checked ? ' checked' : '') + '>' +
-        '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
+        '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + esc(p.emoji) + '</span>' +
         '<span class="pnm">' + esc(p.name) + '</span>' +
         '<span class="psch">' + esc(scheduleLabel(p)) + '</span>' +
         '<button type="button" class="preset-edit" data-edit-custom="' + i + '" aria-label="Edit">✎</button></label>';
@@ -1970,7 +2261,7 @@
         : (!anyHabits && p.starter);
       return '<label class="preset">' +
         '<input type="checkbox" data-preset="' + i + '"' + (checked ? ' checked' : '') + '>' +
-        '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + p.emoji + '</span>' +
+        '<span class="emoji" style="background:' + hexToRgba(p.color, .16) + '">' + esc(p.emoji) + '</span>' +
         '<span class="pnm">' + esc(p.name) + '</span>' +
         '<span class="psch">' + esc(scheduleLabel(p)) + '</span>' +
         '<button type="button" class="preset-edit" data-edit-preset="' + i + '" aria-label="Edit">✎</button></label>';
@@ -2011,16 +2302,18 @@
       openEditor(null, { fromPresets: true });
     });
     $('#addpresets').addEventListener('click', () => {
+      /* Capture picks before gateSampleMod — a warn re-render destroys the checkboxes. */
+      const pickedCustoms = [...document.querySelectorAll('[data-custom]:checked')]
+        .map(cb => pendingCustoms[+cb.dataset.custom])
+        .filter(Boolean);
+      const pickedPresets = [...document.querySelectorAll('[data-preset]:checked')]
+        .map(cb => PRESETS[+cb.dataset.preset])
+        .filter(Boolean);
+      if (!pickedCustoms.length && !pickedPresets.length) {
+        alert('Tick at least one, or create your own.');
+        return;
+      }
       gateSampleMod(() => {
-        const pickedCustoms = [...document.querySelectorAll('[data-custom]:checked')]
-          .map(cb => pendingCustoms[+cb.dataset.custom])
-          .filter(Boolean);
-        const pickedPresets = [...document.querySelectorAll('[data-preset]:checked')]
-          .map(cb => PRESETS[+cb.dataset.preset]);
-        if (!pickedCustoms.length && !pickedPresets.length) {
-          alert('Tick at least one, or create your own.');
-          return;
-        }
         pickedCustoms.forEach(p => Store.addHabit(clonePendingFields(p)));
         pickedPresets.forEach(p => Store.addHabit({
           name: p.name, emoji: p.emoji, color: p.color,
@@ -2073,71 +2366,6 @@
     }));
   }
 
-  function detailHTML(h) {
-    const today = Logic.todayISO();
-    const cur = Logic.currentStreak(h, state.cells, state.skips, today);
-    const best = Logic.bestStreak(h, state.cells, state.skips, today);
-    const total = Logic.totalDone(h, state.cells);
-    const r30 = Logic.completionRate(h, state.cells, state.skips, 30, today);
-    const stg = Logic.strength(h, state.cells, state.skips, today);
-    const unit = Logic.streakUnit(h);
-    const dow = Logic.dowBreakdown(h, state.cells);
-    const dowMax = Math.max.apply(null, dow.concat([1]));
-    const months = Logic.monthlyCounts(h, state.cells, 6, today);
-    const moMax = Math.max.apply(null, months.map(m => m.count).concat([1]));
-    return '<div class="overlay" id="ovl"><div class="sheet"><div class="grab"></div>' +
-      '<div class="dhead">' +
-        '<span class="emoji" style="background:' + hexToRgba(h.color, .16) + '">' + esc(h.emoji) + '</span>' +
-        '<span class="t"><div class="name">' + esc(h.name) + '</div><div class="meta">' + esc(scheduleLabel(h)) + '</div></span>' +
-        '<button id="editbtn">Edit</button><button id="closedetail">✕</button>' +
-      '</div>' +
-      '<div class="statgrid">' +
-        '<div class="stat"><div class="v">' + cur + unit + '</div><div class="k">current streak</div></div>' +
-        '<div class="stat"><div class="v">' + best + unit + '</div><div class="k">best streak</div></div>' +
-        '<div class="stat"><div class="v">' + total + '</div><div class="k">total done</div></div>' +
-        '<div class="stat"><div class="v">' + (r30 === null ? '·' : Math.round(r30 * 100) + '%') + '</div><div class="k">30-day rate</div></div>' +
-        '<div class="stat"><div class="v">' + Math.round(stg * 100) + '</div><div class="k">strength</div></div>' +
-      '</div>' +
-      '<p class="mini" style="margin:8px 0 0">30-day rate: share of scheduled days done in the last 30 days. Strength: 0–100 rolling score (recent days count more; about a 2-week memory).</p>' +
-      (() => {
-        const today = Logic.todayISO();
-        const endISO = Logic.addDays(today, -364 * mapPage);
-        const startISO = Logic.addDays(Logic.weekStartOf(endISO), -7 * 51);
-        const first = Logic.habitStartDate(h, state.cells);
-        const olderExists = first && first < startISO;
-        const rangeLbl = mapPage === 0 ? 'last 52 weeks'
-          : startISO.slice(0, 10) + ' to ' + endISO.slice(0, 10);
-        return '<div class="card" style="margin-top:12px"><h2>Streakmap · ' + rangeLbl + ' · tap to edit any day</h2>' +
-          fullMap(h, 52, endISO) +
-          '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center">' +
-            '<span>Full color = done · faint = rest or off day</span>' +
-            '<span><button class="pagebtn" id="mapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
-            '<button class="pagebtn" id="mapnewer"' + (mapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
-          '</div></div>';
-      })() +
-      '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
-        '<div class="b"><b>' + n + '</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div></div>' +
-      '<div class="card"><h2>Last 6 months</h2><div class="bars">' + months.map(m =>
-        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>' +
-    '</div></div>';
-  }
-
-  function wireDetail(h) {
-    $('#closedetail').addEventListener('click', () => { detailId = null; mapPage = 0; render(); });
-    $('#ovl').addEventListener('click', ev => { if (ev.target.id === 'ovl') { detailId = null; mapPage = 0; render(); } });
-    $('#editbtn').addEventListener('click', () => openEditor(h.id));
-    const older = $('#mapolder'), newer = $('#mapnewer');
-    if (older) older.addEventListener('click', () => { mapPage++; render(); });
-    if (newer) newer.addEventListener('click', () => { mapPage = Math.max(0, mapPage - 1); render(); });
-    document.querySelectorAll('#ovl [data-cell]').forEach(c => c.addEventListener('click', () => {
-      if (c.dataset.cell > Logic.todayISO()) return;
-      gateSampleMod(() => { Store.toggleCell(c.dataset.cell, h.id); render(); });
-    }));
-    /* Narrow sheets: keep the newest weeks in view (GitHub-style left=older). */
-    const gf = document.querySelector('#ovl .gridfull');
-    if (gf) gf.scrollLeft = gf.scrollWidth;
-  }
-
   function openEditor(id, opts) {
     const fromPresets = !!(opts && opts.fromPresets);
     if (!fromPresets) {
@@ -2145,13 +2373,12 @@
       editingPendingIndex = null;
       editingPresetIndex = null;
     }
-    gateSampleMod(() => {
-      const h = id ? Store.getHabit(id) : null;
-      editDraft = h
-        ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: normalizeSchedule(JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' }))) }
-        : { id: null, name: '', emoji: '⭐', color: Store.PALETTE[Store.activeHabits().length % Store.PALETTE.length], schedule: { kind: 'daily' } };
-      render();
-    });
+    /* Opening the editor is free; Save / Archive are gated so Cancel is not an "edit". */
+    const h = id ? Store.getHabit(id) : null;
+    editDraft = h
+      ? { id: h.id, name: h.name, emoji: h.emoji, color: h.color, schedule: normalizeSchedule(JSON.parse(JSON.stringify(h.schedule || { kind: 'daily' }))) }
+      : { id: null, name: '', emoji: '⭐', color: Store.PALETTE[Store.activeHabits().length % Store.PALETTE.length], schedule: { kind: 'daily' } };
+    render();
   }
 
   function editorHTML() {
@@ -2187,7 +2414,7 @@
       schedUI +
       '<div class="btnrow"><button class="btn" id="savehabit">' + (isEdit ? 'Save' : 'Add habit') + '</button>' +
       '<button class="btn ghost" id="canceledit">Cancel</button>' +
-      (d.id ? '<button class="btn danger" id="delhabit">Delete</button>' : '') +
+      (d.id ? '<button class="btn danger" id="delhabit">Archive</button>' : '') +
       '</div>' +
     '</div></div>';
   }
@@ -2250,57 +2477,62 @@
       const schedule = normalizeSchedule(d.schedule);
       if (schedule.kind === 'weekdays' && !schedule.days.length) { alert('Pick at least one weekday.'); return; }
       const fields = { name: d.name.trim(), emoji: d.emoji, color: d.color, schedule };
-      if (d.id) {
-        Store.updateHabit(d.id, fields);
+      const commit = () => {
+        if (d.id) {
+          Store.updateHabit(d.id, fields);
+          editDraft = null;
+          render();
+          return;
+        }
+        if (editorFromPresets) {
+          if (editingPendingIndex != null && pendingCustoms[editingPendingIndex]) {
+            pendingCustoms[editingPendingIndex] = clonePendingFields(fields);
+            if (!customCheckState) {
+              customCheckState = new Set(pendingCustoms.map((_, i) => i));
+            } else {
+              customCheckState.add(editingPendingIndex);
+            }
+            if (presetCheckState) {
+              const nameKey = fields.name.toLowerCase();
+              PRESETS.forEach((p, i) => {
+                if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
+              });
+            }
+          } else {
+            const fromPreset = editingPresetIndex;
+            pendingCustoms.unshift(clonePendingFields(fields));
+            if (fromPreset != null) suppressedPresetIndices.add(fromPreset);
+            if (customCheckState) {
+              const next = new Set([...customCheckState].map(i => i + 1));
+              next.add(0);
+              customCheckState = next;
+            } else {
+              customCheckState = new Set(pendingCustoms.map((_, i) => i));
+            }
+            if (presetCheckState) {
+              if (fromPreset != null) presetCheckState.delete(fromPreset);
+              const nameKey = fields.name.toLowerCase();
+              PRESETS.forEach((p, i) => {
+                if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
+              });
+            }
+          }
+          returnToPresets();
+          return;
+        }
+        Store.addHabit(fields);
         editDraft = null;
         render();
-        return;
-      }
-      if (editorFromPresets) {
-        if (editingPendingIndex != null && pendingCustoms[editingPendingIndex]) {
-          pendingCustoms[editingPendingIndex] = clonePendingFields(fields);
-          if (!customCheckState) {
-            customCheckState = new Set(pendingCustoms.map((_, i) => i));
-          } else {
-            customCheckState.add(editingPendingIndex);
-          }
-          if (presetCheckState) {
-            const nameKey = fields.name.toLowerCase();
-            PRESETS.forEach((p, i) => {
-              if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
-            });
-          }
-        } else {
-          const fromPreset = editingPresetIndex;
-          pendingCustoms.unshift(clonePendingFields(fields));
-          if (fromPreset != null) suppressedPresetIndices.add(fromPreset);
-          if (customCheckState) {
-            const next = new Set([...customCheckState].map(i => i + 1));
-            next.add(0);
-            customCheckState = next;
-          } else {
-            customCheckState = new Set(pendingCustoms.map((_, i) => i));
-          }
-          if (presetCheckState) {
-            if (fromPreset != null) presetCheckState.delete(fromPreset);
-            const nameKey = fields.name.toLowerCase();
-            PRESETS.forEach((p, i) => {
-              if (p.name.toLowerCase() === nameKey) presetCheckState.delete(i);
-            });
-          }
-        }
-        returnToPresets();
-        return;
-      }
-      Store.addHabit(fields);
-      editDraft = null;
-      render();
+      };
+      gateSampleMod(commit);
     });
     const del = $('#delhabit');
     if (del) del.addEventListener('click', () => {
-      Store.updateHabit(d.id, { archived: true });
-      editDraft = null;
-      render();
+      gateSampleMod(() => {
+        Store.updateHabit(d.id, { archived: true });
+        editDraft = null;
+        render();
+      });
     });
   }
 
@@ -2318,8 +2550,14 @@
     if (!f) return;
     const r = new FileReader();
     r.onload = () => {
-      try { Store.importJSON(r.result); clearSampleActive(); render(); alert('Imported.'); }
-      catch (e) { alert('Import failed: ' + e.message); }
+      try {
+        Store.importJSON(r.result);
+        clearSampleActive();
+        render();
+        alert(Sync.state().enabled
+          ? 'Imported into this browser. The next sync will merge with your Drive file.'
+          : 'Imported.');
+      } catch (e) { alert('Import failed: ' + e.message); }
     };
     r.readAsText(f);
     ev.target.value = '';
@@ -2339,7 +2577,7 @@
     if (!tab || demoTourStep) return;
     if (!allowSame && tab === activeTab) return;
     activeTab = tab;
-    detailId = null; editDraft = null; presetsOpen = false; clearPendingPicker(); notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
+    editDraft = null; presetsOpen = false; clearPendingPicker(); notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
     hideHeatTip();
     hideHeatDaySheet();
     render();
@@ -2400,7 +2638,7 @@
     function sheetOpen() {
       return !!(document.querySelector('.overlay') || document.getElementById('heat-day-ovl') ||
         sampleRemindOpen || sampleWarnOpen || demoTourStep || feedbackOpen ||
-        presetsOpen || notesOpen || calOpen || editDraft || detailId);
+        presetsOpen || notesOpen || calOpen || editDraft);
     }
 
     main.addEventListener('touchstart', ev => {
@@ -2447,8 +2685,8 @@
   });
   const reportBtnEl = $('#reportbtn');
   if (reportBtnEl) reportBtnEl.addEventListener('click', () => openFeedback());
-  /* sync dot doubles as a manual sync / reconnect button */
-  $('#syncdot').addEventListener('click', async () => {
+  /* Header sync control: reconnect, sync now, or jump to Settings when local-only. */
+  async function runSyncControl() {
     if (demoTourStep) return;
     if (!Sync.state().enabled) { activeTab = 'settings'; render(); return; }
     try {
@@ -2460,7 +2698,9 @@
       }
     } catch (e) { /* status already set */ }
     render();
-  });
+  }
+  const syncCtlEl = $('#syncctl');
+  if (syncCtlEl) syncCtlEl.addEventListener('click', () => { runSyncControl(); });
 
   // ---------- boot ----------
   try {
@@ -2485,18 +2725,91 @@
   })();
   Sync.init({
     getDoc: () => Store.get(),
-    applyDoc: doc => { Store.replaceState(doc); render(); },
+    applyDoc: (doc, opts) => {
+      captureNoteDraftFromDom();
+      Store.replaceState(doc);
+      /* Re-apply in-progress note so a merge does not clobber typing. */
+      if (noteDraft) commitNoteDraft(noteDraft.iso);
+      /* Only first-connect adopt clears sample flags — routine merges must not end the tour. */
+      if (opts && opts.adoptRemote && sampleDataActive()) clearSampleActive();
+      render();
+    },
     onStatus: (s, detail) => {
       syncStatus = { s, detail };
-      const dot = $('#syncdot');
-      if (dot) { dot.className = 'syncdot ' + syncDotClass(); dot.title = syncDotTitle(); }
+      updateSyncChrome();
       if (s === 'ok' || s === 'off') clearReconnectBannerHide();
       renderInfoBanner();
     }
   });
+
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'Escape') return;
+    if (document.getElementById('heat-day-ovl')) {
+      hideHeatDaySheet();
+      return;
+    }
+    /* Visible sheets beat the tour (tour card is hidden while a sheet is open). */
+    if (sampleWarnOpen) {
+      const skip = $('#sample-warn-skip');
+      if (skip) skip.click();
+      return;
+    }
+    if (sampleRemindOpen) {
+      const hide = $('#sample-remind-hide');
+      if (hide) hide.click();
+      return;
+    }
+    if (feedbackOpen && window.Feedback && typeof Feedback.close === 'function') {
+      Feedback.close();
+      return;
+    }
+    if (editDraft) {
+      const close = $('#closeedit') || $('#canceledit');
+      if (close) close.click();
+      else { editDraft = null; render(); }
+      return;
+    }
+    if (presetsOpen) {
+      const close = $('#closepresets');
+      if (close) close.click();
+      else { presetsOpen = false; render(); }
+      return;
+    }
+    if (notesOpen) {
+      const close = $('#closenotes');
+      if (close) close.click();
+      else { notesOpen = false; render(); }
+      return;
+    }
+    if (calOpen) {
+      const close = $('#calclose');
+      if (close) close.click();
+      else { calOpen = false; render(); }
+      return;
+    }
+    if (demoTourStep) {
+      endDemoTour();
+      render();
+    }
+  });
+  try {
+    if (localStorage.getItem('daycells-v2_orphan') && localStorage.getItem('dc_orphan_warned') !== '1') {
+      localStorage.setItem('dc_orphan_warned', '1');
+      alert('A previous Daycells save used an unrecognized format and was kept as a backup on this device. Export/import if you need to recover it, or clear site data once you have a good backup.');
+    }
+  } catch (e) {}
   render();
-  /* First visit: auto-load demo + tour. After Start tracking: empty → presets. */
-  if (!Store.activeHabits().length && lsGet('dc_sample_cleared') !== '1') {
+  /* First visit: auto-load demo + tour only when the local document is truly empty.
+     Do not re-seed when the user has archived habits / notes (e.g. after Drive adopt). */
+  function isEmptyLocalDoc() {
+    const s = Store.get();
+    if ((s.habits || []).some(h => h && !h.deleted)) return false;
+    if (s.cells && Object.keys(s.cells).length) return false;
+    if (s.skips && Object.keys(s.skips).length) return false;
+    if (s.notes && Object.keys(s.notes).some(iso => String((s.notes[iso] || {}).text || '').trim())) return false;
+    return true;
+  }
+  if (isEmptyLocalDoc() && lsGet('dc_sample_cleared') !== '1') {
     if (seedDemoAndStartTour()) render();
   } else if (!Store.activeHabits().length && !localStorage.getItem('dc_presets_seen')) {
     localStorage.setItem('dc_presets_seen', '1');
@@ -2504,6 +2817,14 @@
     render();
   }
   Sync.resume();
+  function flushNoteOnLeave() {
+    captureNoteDraftFromDom();
+    commitNoteDraft();
+  }
+  window.addEventListener('pagehide', flushNoteOnLeave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushNoteOnLeave();
+  });
   /* offline + installability; no-op on file:// */
   if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -2521,4 +2842,5 @@
   setInterval(() => {
     if (activeTab === 'habits' && !viewDate && $('#view').dataset.viewIso !== Logic.todayISO()) render();
   }, 60000);
+  window.addEventListener('resize', () => { layoutInfoBanner(); });
 })();

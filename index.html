@@ -44,7 +44,13 @@
         <svg class="ico" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2.5l6.5 12.2H2.5L9 2.5z" fill="none"/><path d="M9 7v3.2"/><circle cx="9" cy="12.2" r="0.7" fill="currentColor" stroke="none"/></svg>
         <span class="report-lbl">Report</span>
       </button>
-      <span class="sub"><span id="subline">local</span><span class="syncdot" id="syncdot"></span></span>
+      <span class="sub">
+        <span id="subline">local</span>
+        <button type="button" class="syncctl" id="syncctl" aria-label="Sync status">
+          <span class="syncdot" id="syncdot" aria-hidden="true"></span>
+          <span class="synclbl" id="synclbl" hidden>Reconnect</span>
+        </button>
+      </span>
     </div>
   </header>
   <main id="view"></main>

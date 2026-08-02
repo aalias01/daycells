@@ -503,6 +503,7 @@ window.Feedback = (() => {
   return {
     enabled,
     open,
+    close,
     mount,
     isOpen,
     collectMeta,

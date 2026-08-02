@@ -75,7 +75,12 @@ const Store = (() => {
   function load() {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (raw) { const s = JSON.parse(raw); if (s && s.version === 2) { state = Object.assign(blank(), s); return state; } }
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && s.version === 2) { state = Object.assign(blank(), s); return state; }
+        /* Keep a backup instead of silently wiping an unrecognized shape. */
+        try { localStorage.setItem(LS_KEY + '_orphan', raw); } catch (e) {}
+      }
     } catch (e) { /* fall through */ }
     try {
       const legacy = localStorage.getItem(LEGACY_LS_KEY);
@@ -94,11 +99,30 @@ const Store = (() => {
     save();
     return state;
   }
+  let lastSaveErr = null;
   function save() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { /* quota */ }
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      lastSaveErr = null;
+    } catch (e) {
+      lastSaveErr = e;
+    }
     if (onChange) onChange();
   }
-  function replaceState(s) { state = Object.assign(blank(), s); try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function replaceState(s) {
+    state = Object.assign(blank(), s);
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      lastSaveErr = null;
+    } catch (e) {
+      lastSaveErr = e;
+    }
+  }
+  function consumeSaveError() {
+    const e = lastSaveErr;
+    lastSaveErr = null;
+    return e;
+  }
 
   // ---------- habit CRUD ----------
   function activeHabits() {
@@ -176,7 +200,7 @@ const Store = (() => {
   function init(cb) { onChange = cb; return load(); }
   const get = () => state;
 
-  return { init, get, save, replaceState, PALETTE,
+  return { init, get, save, replaceState, consumeSaveError, PALETTE,
     activeHabits, archivedHabits, getHabit, addHabit, updateHabit, moveHabit, reorderHabits, deleteHabit,
     toggleCell, toggleSkip, setNote, getNote, setSetting, exportJSON, importJSON, resetAll, migrateV1, blank };
 })();

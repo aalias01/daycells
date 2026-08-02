@@ -263,20 +263,31 @@ const Logic = (() => {
   }
 
   function perfectDayStreak(habits, cells, skips, uptoISO) {
-    const active = habits.filter(h => !h.archived && !h.deleted);
+    /* Day-level perfect streak: daily/weekday habits only. Per-week targets are not
+       "due" on a calendar day, so counting them here turned empty days into skips and
+       walked back to year 2000 (lifetime done-count, not a streak). */
+    const active = habits.filter(h => !h.archived && !h.deleted && !isPerWeek(h));
+    if (!active.length) return 0;
+    let earliest = uptoISO;
+    for (const h of active) {
+      const start = habitStartDate(h, cells);
+      if (start && start < earliest) earliest = start;
+    }
     let streak = 0;
     let iso = uptoISO;
     for (;;) {
+      if (iso < earliest) break;
       let req = 0, done = 0;
       for (const h of active) {
         const d = isDone(cells, iso, h.id);
-        const r = isPerWeek(h) ? d : isRequired(h, iso, skips);
+        const r = isRequired(h, iso, skips);
         if (d) { done++; req++; }
         else if (r) req++;
       }
-      if (!req) { iso = addDays(iso, -1); if (iso < '2000-01-01') break; continue; }
-      if (done === req) { streak++; iso = addDays(iso, -1); if (iso < '2000-01-01') break; continue; }
-      if (iso === uptoISO) break;
+      if (!req) { iso = addDays(iso, -1); continue; }
+      if (done === req) { streak++; iso = addDays(iso, -1); continue; }
+      /* Today stays pending (same as dayStreak / strength); incomplete today does not zero the streak. */
+      if (iso === uptoISO) { iso = addDays(iso, -1); continue; }
       break;
     }
     return streak;
