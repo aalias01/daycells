@@ -8,8 +8,9 @@
  *    per key. Two devices ticking different days never conflict.
  *  - settings: newest settingsUpdatedAt wins.
  *
- * Auth: background pushes never call GIS. Silent re-auth only via silentBoot
- * on resume/foreground. Interactive reconnect only from a user gesture.
+ * Auth: background pushes never open a sign-in UI. Silent re-auth via
+ * GDrive.silentBoot (BFF refresh cookie, or GIS prompt:none fallback).
+ * Interactive connect redirects to /api/auth/start when needed.
  *
  * First connect (sync was off): if Drive already has habits, adopt remote only —
  * do not merge unsigned local data into an existing file. Reconnect / later syncs merge.
@@ -30,6 +31,7 @@ const Sync = (() => {
   let dirtyPending = false;
   let lastSync = null;
   let visibilityWired = false;
+  let refreshPushInflight = false;
 
   function migratePrefs() {
     try {
@@ -151,7 +153,25 @@ const Sync = (() => {
       dirtyPending = true;
       clearTimeout(timer);
       timer = null;
-      setStatus('auth', AUTH_DETAIL);
+      if (refreshPushInflight) return;
+      refreshPushInflight = true;
+      setStatus('pending');
+      GDrive.silentBoot()
+        .then(() => {
+          refreshPushInflight = false;
+          if (!state().enabled) return;
+          if (GDrive.cachedToken()) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fullSync(false), PUSH_DELAY);
+            setStatus('pending');
+          } else {
+            setStatus('auth', AUTH_DETAIL);
+          }
+        })
+        .catch(() => {
+          refreshPushInflight = false;
+          if (state().enabled) setStatus('auth', AUTH_DETAIL);
+        });
       return;
     }
     clearTimeout(timer);
@@ -160,7 +180,7 @@ const Sync = (() => {
   }
 
   /* After Reset all: write a blank doc to Drive without merging (merge would resurrect remote data).
-   * Always interactive — Reset all is a user gesture, so GIS can re-prompt for missing Drive scope.
+   * Always interactive — Reset all is a user gesture.
    * Caller should invoke this before clearing local when sync is enabled.
    */
   async function overwriteRemoteBlank() {
@@ -180,7 +200,11 @@ const Sync = (() => {
     };
     setStatus('syncing');
     try {
-      await GDrive.getToken(true);
+      try {
+        await GDrive.refreshSession();
+      } catch (e) {
+        throw new Error('Sign in to Google Drive first, then try Reset all.');
+      }
       if (!fileId) {
         const r = await GDrive.ensureFile(blank, true);
         fileId = r.fileId;
@@ -200,8 +224,9 @@ const Sync = (() => {
     }
   }
 
-  async function connect() {
-    await GDrive.getToken(true);
+  /** Complete connect after cookie/token is available (post-redirect or silent refresh). */
+  async function finishConnect() {
+    await GDrive.refreshSession();
     const email = await GDrive.userEmail();
     const wasEnabled = localStorage.getItem(ENABLED_KEY) === '1';
     localStorage.setItem(ENABLED_KEY, '1');
@@ -209,6 +234,25 @@ const Sync = (() => {
     dirtyPending = false;
     await fullSync(true, wasEnabled ? undefined : { adoptRemote: true });
     return email;
+  }
+
+  /**
+   * User-gesture connect. Tries silent refresh first; if that fails, redirects to Google
+   * (BFF) or opens GIS popup (fallback). Returns email, or null when a redirect started.
+   */
+  async function connect() {
+    try {
+      await GDrive.refreshSession();
+    } catch (e) {
+      try {
+        await GDrive.getToken(true);
+      } catch (e2) {
+        throw e2;
+      }
+      /* getToken may navigate away (BFF); if we still have a token, finish. */
+      if (!GDrive.cachedToken()) return null;
+    }
+    return finishConnect();
   }
 
   function disconnect() {
@@ -222,7 +266,7 @@ const Sync = (() => {
 
   async function resume() {
     if (!state().enabled) { setStatus('off'); return; }
-    if (!GDrive.canUse()) { setStatus('error', GDrive.unavailableReason()); return; }
+    if (!GDrive.onHttp()) { setStatus('error', GDrive.unavailableReason()); return; }
     try {
       await GDrive.silentBoot();
       await fullSync(false);
@@ -233,7 +277,7 @@ const Sync = (() => {
   }
 
   async function onForeground() {
-    if (!state().enabled || !GDrive.canUse()) return;
+    if (!state().enabled || !GDrive.onHttp()) return;
     if (GDrive.cachedToken()) {
       if (dirtyPending) schedulePush();
       return;
@@ -263,7 +307,10 @@ const Sync = (() => {
     wireVisibility();
   }
 
-  return { init, connect, disconnect, resume, schedulePush, fullSync, overwriteRemoteBlank, state, mergeDocs, mergeById, mergeKeyed };
+  return {
+    init, connect, finishConnect, disconnect, resume, schedulePush, fullSync,
+    overwriteRemoteBlank, state, mergeDocs, mergeById, mergeKeyed
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = Sync;

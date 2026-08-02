@@ -2,8 +2,15 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v46';
+  window.DC_VERSION = 'dc-v47';
   const $ = sel => document.querySelector(sel);
+  function authErrMsg(e, fallback) {
+    const m = (e && e.message) || '';
+    if (m === GDrive.NEEDS_AUTH || m === 'needs-auth') {
+      return fallback || 'Google Drive needs Sign in again.';
+    }
+    return m || fallback || 'Something went wrong';
+  }
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
   (function migrateLocalPrefs() {
@@ -898,7 +905,7 @@
     const body = kind === 'sample'
       ? 'Ready to track for real? This clears the demo so you can add your own habits.'
       : kind === 'reconnect'
-        ? 'Checks still save on this device. Tap Reconnect to resume Google Drive.'
+        ? 'Checks still save on this device. Tap Reconnect if Drive needs a fresh Google sign-in.'
         : 'Optional: Sign in with Google in Settings to keep habits in your Drive.';
     const html =
       '<div class="info-banner-text">' +
@@ -950,7 +957,7 @@
           await Sync.connect();
           clearReconnectBannerHide();
         } catch (e) {
-          alert(e.message || 'Could not reconnect');
+          alert(authErrMsg(e, 'Could not reconnect'));
         }
         render();
       });
@@ -1521,7 +1528,7 @@
           '<button class="btn" id="help-sync">Sync now</button>' +
           '<button class="btn ghost" id="help-disconnect">Sign out</button>' +
         '</div>' +
-        '<p class="mini">After reopening the app (especially on iPhone), Drive may pause until you tap <b>Reconnect</b> on the banner or the header sync control. Checks still save on this device meanwhile. If another device looks stale, open the app there and Sync now.</p>' +
+        '<p class="mini">After you Sign in once, this device should stay connected across reopen (including phone home-screen apps). If Drive ever pauses, tap <b>Reconnect</b> on the banner or the header sync control. Checks still save on this device meanwhile. If another device looks stale, open the app there and Sync now.</p>' +
         '<p class="mini"><b>Sign out</b> stops syncing on this device. Your Daycells file stays in Google Drive.</p>' +
         '</div>';
     } else if (configured && GDrive.onHttp()) {
@@ -1591,7 +1598,7 @@
 
     const connect = $('#help-connect');
     if (connect) connect.addEventListener('click', async () => {
-      try { await Sync.connect(); } catch (e) { alert(e.message); }
+      try { await Sync.connect(); } catch (e) { alert(authErrMsg(e)); }
       render();
     });
     const syncBtn = $('#help-sync');
@@ -1719,7 +1726,7 @@
 
     const cn = $('#connect');
     if (cn) cn.addEventListener('click', async () => {
-      try { await Sync.connect(); } catch (e) { alert(e.message); }
+      try { await Sync.connect(); } catch (e) { alert(authErrMsg(e)); }
       render();
     });
     wireInstallCard();
@@ -2749,7 +2756,38 @@
     presetsOpen = true;
     render();
   }
-  Sync.resume();
+  /* OAuth BFF return: /?auth=ok|error&err=... — finish before resume to avoid races. */
+  (async function bootSync() {
+    let params;
+    try { params = new URLSearchParams(location.search); } catch (e) { params = null; }
+    const auth = params && params.get('auth');
+    if (auth) {
+      const err = params.get('err') || '';
+      params.delete('auth');
+      params.delete('err');
+      const q = params.toString();
+      try {
+        history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+      } catch (e) {}
+      if (auth === 'error') {
+        alert(err || 'Google sign-in failed');
+      } else if (auth === 'ok') {
+        try {
+          await Sync.finishConnect();
+          clearReconnectBannerHide();
+          render();
+          return;
+        } catch (e) {
+          const msg = (e && e.message) || '';
+          alert(msg === GDrive.NEEDS_AUTH
+            ? 'Could not finish Google Drive connect. Tap Sign in again.'
+            : (msg || 'Could not finish Google Drive connect'));
+          /* Fall through to resume so Reconnect status/banner can appear. */
+        }
+      }
+    }
+    await Sync.resume();
+  })();
   function flushNoteOnLeave() {
     captureNoteDraftFromDom();
     commitNoteDraft();

@@ -1,13 +1,13 @@
 /* Daycells: Google account + Drive storage (BYO cloud).
- * Google Identity Services token flow, client-side only, no app server.
+ * Primary auth: Vercel OAuth BFF (/api/auth/*) with refresh token in httpOnly cookie.
+ * Fallback: Google Identity Services token client when BFF is not configured (local/forks).
  * Scope drive.file: the app can ONLY see files it created, one JSON doc
  * in a visible "Daycells" folder in the USER'S OWN Drive.
  * Legacy StreakGrid folder/file is renamed on first open after migrate.
- * Pattern shared with NutriChat (personal/nutrition tracker).
  *
- * Token rules: background paths never call requestAccessToken (avoids GIS
- * flash on every edit). Silent prompt:none only via silentBoot(); visible
- * auth only via getToken(true) from a user gesture.
+ * Token rules: background paths never open a sign-in UI. Silent re-auth via
+ * /api/auth/refresh (or GIS prompt:none fallback). Visible auth redirects to
+ * /api/auth/start (or GIS popup when BFF unavailable).
  */
 const GDrive = (() => {
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -16,12 +16,16 @@ const GDrive = (() => {
   const FOLDER_NAME = 'Daycells';
   const LEGACY_FILE = 'streakgrid-data.json';
   const LEGACY_FOLDER = 'StreakGrid';
-  const TOKEN_KEY = 'dc_gtoken_v1'; // sessionStorage: survives reloads, not browser restarts
+  const TOKEN_KEY = 'dc_gtoken_v1'; // sessionStorage: short-lived access token cache
   const LEGACY_TOKEN = 'sg_gtoken_v1';
   const CLIENT_KEY = 'dc_gclient';
   const LEGACY_CLIENT = 'sg_gclient';
-  const SILENT_COOLDOWN_MS = 60 * 1000;
+  const AUTH_REFRESH = '/api/auth/refresh';
+  const AUTH_START = '/api/auth/start';
+  const AUTH_LOGOUT = '/api/auth/logout';
+  const SILENT_COOLDOWN_MS = 15 * 1000;
   const NEEDS_AUTH = 'needs-auth';
+  const BFF_UNAVAILABLE = 'auth-bff-unavailable';
   const MISSING_DRIVE =
     'Google Drive permission was not granted. Sign in again and allow Drive access.';
 
@@ -29,6 +33,8 @@ const GDrive = (() => {
   let pending = null;
   let memToken = null; // { token, exp }
   let lastSilentAt = 0;
+  let refreshInflight = null;
+  let bffKnown = null; // null unknown, true/false after first refresh probe
 
   /** Google granular consent: email can succeed while Drive stays unchecked. */
   function hasDriveScope(resp) {
@@ -60,13 +66,17 @@ const GDrive = (() => {
   }
   const libReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
   const onHttp = () => location.protocol === 'http:' || location.protocol === 'https:';
-  const configured = () => !!clientId();
-  const canUse = () => onHttp() && configured();
+  const configured = () => !!clientId() || bffKnown === true;
+  const canUse = () => onHttp() && (configured() || bffKnown !== false);
 
   function unavailableReason() {
     if (!onHttp()) return 'Google sign-in needs the app served over http(s). Run: python3 -m http.server 8080, or deploy it (Vercel, GitHub Pages).';
-    if (!configured()) return 'No OAuth Client ID yet. Open Advanced below to paste one, or use a deploy that sets GOOGLE_CLIENT_ID.';
-    if (!libReady()) return 'Google sign-in library is still loading. Try again in a moment.';
+    if (!configured() && bffKnown === false) {
+      return 'No OAuth Client ID yet. Open Advanced below to paste one, or use a deploy that sets GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / AUTH_SECRET.';
+    }
+    if (!configured() && !clientId()) {
+      return 'No OAuth Client ID yet. Open Advanced below to paste one, or use a deploy that sets GOOGLE_CLIENT_ID.';
+    }
     return null;
   }
 
@@ -102,7 +112,7 @@ const GDrive = (() => {
     } catch (e) { return null; }
   }
 
-  /** Passive only — never calls GIS. */
+  /** Passive only — never calls network or GIS. */
   function cachedToken() {
     if (memToken && memToken.exp > Date.now()) return memToken.token;
     const t = readSessionToken();
@@ -115,7 +125,7 @@ const GDrive = (() => {
   }
 
   function initClient() {
-    if (tokenClient || !libReady() || !configured()) return;
+    if (tokenClient || !libReady() || !clientId()) return;
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId(),
       scope: SCOPE,
@@ -139,7 +149,8 @@ const GDrive = (() => {
 
   function requestToken(prompt) {
     const reason = unavailableReason();
-    if (reason) return Promise.reject(new Error(reason));
+    if (reason && !clientId()) return Promise.reject(new Error(reason));
+    if (!libReady()) return Promise.reject(new Error('Google sign-in library is still loading. Try again in a moment.'));
     initClient();
     if (!tokenClient) return Promise.reject(new Error('Sign-in not ready'));
     if (pending) return Promise.reject(new Error('Sign-in already in progress'));
@@ -150,22 +161,115 @@ const GDrive = (() => {
     });
   }
 
-  /**
-   * interactive true: user gesture — may show GIS UI.
-   * interactive false: cached token only; never calls requestAccessToken.
-   * forceConsent: prompt=consent (re-ask scopes after a partial grant).
-   */
-  function getToken(interactive, forceConsent) {
-    const t = cachedToken();
-    if (t && !forceConsent) return Promise.resolve(t);
-    if (!interactive) return Promise.reject(new Error(NEEDS_AUTH));
-    return requestToken(forceConsent ? 'consent' : '');
+  async function refreshFromServer() {
+    if (refreshInflight) return refreshInflight;
+    refreshInflight = (async () => {
+      let res;
+      try {
+        res = await fetch(AUTH_REFRESH, {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' }
+        });
+      } catch (e) {
+        bffKnown = false;
+        throw new Error(BFF_UNAVAILABLE);
+      }
+      /* Static hosts return 404/405/501 — that is not a BFF. */
+      if (res.status === 503 || res.status === 404 || res.status === 405 ||
+          res.status === 501 || res.status === 502) {
+        bffKnown = false;
+        throw new Error(BFF_UNAVAILABLE);
+      }
+      let j = null;
+      try { j = await res.json(); } catch (e) { j = null; }
+      if (!j || typeof j !== 'object') {
+        bffKnown = false;
+        throw new Error(BFF_UNAVAILABLE);
+      }
+      if (res.status === 403 || j.error === 'missing-drive-scope') {
+        bffKnown = true;
+        clearCachedToken();
+        throw new Error(MISSING_DRIVE);
+      }
+      if (res.status === 401 || j.error === 'needs-auth') {
+        bffKnown = true;
+        clearCachedToken();
+        throw new Error(NEEDS_AUTH);
+      }
+      if (!res.ok || !j.access_token) {
+        bffKnown = false;
+        throw new Error(BFF_UNAVAILABLE);
+      }
+      bffKnown = true;
+      if (j.scope && j.scope.split(/\s+/).indexOf(DRIVE_SCOPE) === -1) {
+        clearCachedToken();
+        throw new Error(MISSING_DRIVE);
+      }
+      if (j.email) {
+        try { sessionStorage.setItem('dc_gemail_v1', j.email); } catch (e) {}
+      }
+      return cacheToken(j.access_token, j.expires_in);
+    })().finally(() => { refreshInflight = null; });
+    return refreshInflight;
   }
 
-  /** Single silent GIS attempt (prompt:none). Rate-limited; visibility-gated. */
-  function silentBoot() {
+  /** Access token via BFF/cache without silentBoot cooldown (post-redirect connect). */
+  async function refreshSession() {
     const t = cachedToken();
-    if (t) return Promise.resolve(t);
+    if (t) return t;
+    return refreshFromServer();
+  }
+
+  /** Full-page redirect to Google via BFF. Does not return. */
+  function beginLogin() {
+    location.href = AUTH_START;
+  }
+
+  /**
+   * interactive true: may redirect to Google or show GIS UI.
+   * interactive false: cached token or silent BFF refresh only (no GIS UI).
+   * forceConsent: re-ask scopes (BFF start always uses consent; GIS uses prompt=consent).
+   */
+  async function getToken(interactive, forceConsent) {
+    const t = cachedToken();
+    if (t && !forceConsent) return t;
+
+    if (forceConsent) {
+      if (!interactive) throw new Error(NEEDS_AUTH);
+      if (bffKnown !== false) {
+        beginLogin();
+        return new Promise(() => {});
+      }
+      if (!clientId()) throw new Error(unavailableReason() || NEEDS_AUTH);
+      return requestToken('consent');
+    }
+
+    try {
+      return await refreshFromServer();
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if (msg === MISSING_DRIVE) {
+        if (!interactive) throw new Error(MISSING_DRIVE);
+        beginLogin();
+        return new Promise(() => {});
+      }
+      if (msg === BFF_UNAVAILABLE) {
+        if (!interactive) throw new Error(NEEDS_AUTH);
+        if (!clientId()) throw new Error(unavailableReason() || NEEDS_AUTH);
+        return requestToken('');
+      }
+      if (!interactive) throw new Error(NEEDS_AUTH);
+      beginLogin();
+      return new Promise(() => {});
+    }
+  }
+
+  /** Silent re-auth: BFF refresh, then GIS prompt:none if BFF unavailable. */
+  async function silentBoot() {
+    const t = cachedToken();
+    if (t) return t;
     if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') {
       return Promise.reject(new Error(NEEDS_AUTH));
     }
@@ -173,13 +277,27 @@ const GDrive = (() => {
       return Promise.reject(new Error(NEEDS_AUTH));
     }
     lastSilentAt = Date.now();
-    return requestToken('none').catch(() => Promise.reject(new Error(NEEDS_AUTH)));
+    try {
+      return await refreshFromServer();
+    } catch (e) {
+      if ((e && e.message) === BFF_UNAVAILABLE && clientId() && libReady()) {
+        return requestToken('none').catch(() => Promise.reject(new Error(NEEDS_AUTH)));
+      }
+      return Promise.reject(new Error((e && e.message) === MISSING_DRIVE ? MISSING_DRIVE : NEEDS_AUTH));
+    }
   }
 
   function signOut() {
-    const t = cachedToken();
     clearCachedToken();
-    if (t && libReady()) { try { google.accounts.oauth2.revoke(t, () => {}); } catch (e) {} }
+    try { sessionStorage.removeItem('dc_gemail_v1'); } catch (e) {}
+    try {
+      fetch(AUTH_LOGOUT, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
   }
 
   // ---------- authorized fetch ----------
@@ -222,9 +340,22 @@ const GDrive = (() => {
   const withAuth = (opts = {}, token) => ({ ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + token } });
 
   async function userEmail() {
-    const res = await gfetch('https://www.googleapis.com/oauth2/v3/userinfo', undefined, true);
-    const j = await res.json();
-    return j.email || '';
+    try {
+      const cached = sessionStorage.getItem('dc_gemail_v1');
+      if (cached) return cached;
+    } catch (e) {}
+    try {
+      const res = await gfetch('https://www.googleapis.com/oauth2/v3/userinfo', undefined, false);
+      const j = await res.json();
+      const email = j.email || '';
+      if (email) {
+        try { sessionStorage.setItem('dc_gemail_v1', email); } catch (e) {}
+      }
+      return email;
+    } catch (e) {
+      /* Email scope is optional; Drive sync still works. */
+      return '';
+    }
   }
 
   // ---------- Drive file ops ----------
@@ -307,8 +438,9 @@ const GDrive = (() => {
   }
 
   return {
-    canUse, configured, onHttp, unavailableReason, getToken, silentBoot, cachedToken,
-    signOut, userEmail, ensureFile, readFile, writeFile, storedToken: cachedToken, clientId, NEEDS_AUTH
+    canUse, configured, onHttp, unavailableReason, getToken, silentBoot, refreshSession,
+    cachedToken, beginLogin, signOut, userEmail, ensureFile, readFile, writeFile,
+    storedToken: cachedToken, clientId, NEEDS_AUTH, BFF_UNAVAILABLE
   };
 })();
 

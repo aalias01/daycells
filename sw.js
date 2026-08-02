@@ -2,7 +2,7 @@
  * Strategy: stale-while-revalidate for same-origin GETs. Bump VERSION to
  * force-refresh cached assets after a deploy.
  */
-const VERSION = 'dc-v46';
+const VERSION = 'dc-v47';
 const PRECACHE = [
   './',
   'index.html',
@@ -41,6 +41,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return; // Google APIs etc. go to network
+  if (url.pathname.indexOf('/api/') === 0) return; // auth + feedback: network only
   e.respondWith(
     caches.open(VERSION).then(async cache => {
       const cached = await cache.match(e.request);

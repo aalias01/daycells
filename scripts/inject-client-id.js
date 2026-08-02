@@ -2,8 +2,10 @@
 /**
  * Vercel (or local) build step: inject deploy env into js/config.js.
  * Committed file stays empty so public forks never copy secrets.
- * Env vars (all optional):
- *   GOOGLE_CLIENT_ID     — Google OAuth Web Client ID
+ * Env vars (all optional for inject; auth BFF also needs secrets server-side):
+ *   GOOGLE_CLIENT_ID     — Google OAuth Web Client ID (injected into client config)
+ *   GOOGLE_CLIENT_SECRET — server-only; used by /api/auth/* (not written to config.js)
+ *   AUTH_SECRET          — server-only; encrypts refresh cookie (not written to config.js)
  *   DISCORD_WEBHOOK_URL  — server-only Discord webhook (also used by /api/feedback).
  *                          When set, client feedbackEndpoint becomes "/api/feedback".
  *   FEEDBACK_ENDPOINT    — override client endpoint (e.g. direct webhook for local tests)

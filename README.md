@@ -1,13 +1,13 @@
 # Daycells
 
-Habit tracker with a GitHub-style contribution grid per habit. Static site. No backend. Your data stays in your browser, and optionally in a JSON file in your own Google Drive.
+Habit tracker with a GitHub-style contribution grid per habit. Static front end on Vercel, with a small optional auth API for always-connected Google Drive. Your data stays in your browser, and optionally in a JSON file in your own Google Drive.
 
 **Live app:** [https://daycells.vercel.app](https://daycells.vercel.app)  
 **Source:** [github.com/aalias01/daycells](https://github.com/aalias01/daycells) ([MIT](#license))
 
 Open the live URL, tap +, start checking habits. On the live deploy, a Google OAuth Client ID is already set (via Vercel env at build time). If your Gmail is on the project’s test-user list, open Help or Settings and tap **Sign in with Google**. No paste needed.
 
-Forks and your own deploys: leave committed `js/config.js` empty. Create your own Client ID (steps below), then either set `GOOGLE_CLIENT_ID` on your host’s build env or paste it under Settings → Advanced.
+Forks and your own deploys: leave committed `js/config.js` empty. Create your own OAuth client (steps below), set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `AUTH_SECRET` on Vercel for always-connected sync, or paste a Client ID under Settings → Advanced for the older popup fallback.
 
 ## License
 
@@ -23,7 +23,7 @@ Daycells is licensed under the [MIT License](LICENSE) (Copyright 2026 Alvin Alia
 
 The OAuth **Client ID** identifies the app/project. The **signed-in Google account** owns the Drive file. Two people can share one Client ID and still get separate Drive files if each signs in with their own Gmail.
 
-Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes). **First sign-in** (this browser was not connected yet): if Drive already has habits, this device adopts the Drive copy and does not append unsigned local habits. **Reconnect** while already signed in (or after Drive pauses) merges local checks with Drive so offline edits are kept. After reopen, if Google blocks a quiet reconnect (common on iPhone), Drive pauses until you tap **Reconnect**; local checks keep working.
+Sync is offline-first: the browser is the working copy; Drive is durability. Pushes debounce about 4 seconds after a change. Merge is last-write-wins per habit/day (and habit tombstones for deletes). **First sign-in** (this browser was not connected yet): if Drive already has habits, this device adopts the Drive copy and does not append unsigned local habits. **Reconnect** while already signed in merges local checks with Drive so offline edits are kept. On the live Vercel deploy, sign-in uses a small auth API that stores a Google **refresh token** in an httpOnly cookie, so Pixel/iPhone home-screen apps can stay connected across reopen without tapping Reconnect. Local checks always keep working if Drive ever pauses (revoked access, cleared site data, or Google Testing refresh expiry).
 
 ## Use
 
@@ -71,13 +71,18 @@ About five minutes. Free for normal personal use. Use this section when you **cr
 4. **Clients → Create client → Web application.**
    - Authorized JavaScript origins (no path, no trailing slash):
      - your deploy URL (e.g. `https://your-app.vercel.app`), and/or
-     - `http://localhost:8080` for local serve
-   - Leave **Authorized redirect URIs** empty.
-   - Create. Copy the **Client ID** only (`….apps.googleusercontent.com`). Ignore the **Client Secret** (not used by this static app; never paste it into Daycells or git).
-5. Wire the Client ID (pick one):
-   - **Vercel:** Project → Settings → Environment Variables → `GOOGLE_CLIENT_ID` = that string (Production). Redeploy so `npm run build` injects it into `js/config.js`. Do not commit the filled file.
-   - **Or** Daycells → Settings → **Advanced: override Client ID** → paste → **Sign in with Google**.
-6. Confirm Google Drive has folder **Daycells** / file **daycells-data.json**. On another device: same account, Sign in (override paste once per browser if you are not using env inject).
+     - `http://localhost:3000` for `vercel dev` (and `http://localhost:8080` if you still use a static server + GIS fallback)
+   - **Authorized redirect URIs** (required for always-connected auth):
+     - `https://your-app.vercel.app/api/auth/callback`
+     - `http://localhost:3000/api/auth/callback` for local `vercel dev`
+   - Create. Copy the **Client ID** (`….apps.googleusercontent.com`) and the **Client Secret**. Never commit the secret or paste it into the browser UI.
+5. Wire env on **Vercel** (Project → Settings → Environment Variables, Production):
+   - `GOOGLE_CLIENT_ID` = Client ID (also injected into `js/config.js` at build)
+   - `GOOGLE_CLIENT_SECRET` = Client Secret (server-only; used by `/api/auth/*`)
+   - `AUTH_SECRET` = a long random string (e.g. `openssl rand -hex 32`) used to encrypt the refresh cookie
+   - Redeploy. Do not commit filled `js/config.js`.
+6. Confirm Google Drive has folder **Daycells** / file **daycells-data.json**. On another device: same Google account → **Sign in with Google** once.
+7. **Forks / static-only hosts:** without `GOOGLE_CLIENT_SECRET` + `AUTH_SECRET`, Sign in falls back to the older Google Identity Services popup (session access token only; may ask to Reconnect after PWA reopen). Advanced → override Client ID still helps that fallback path.
 
 ### Data Access (scopes in the console)
 
@@ -99,9 +104,11 @@ To register scopes:
 | Mode | Who can sign in | When to use |
 |------|-----------------|-------------|
 | **Testing** (default) | Only Gmails listed as test users | Personal / household. Stay here. |
-| **In production** (publish) | Any Google account | Only if you want strangers to use **your** Client ID on your origin. Free, but they share your project’s OAuth/Drive API quotas. You lose the test-user gate. |
+| **In production** (publish) | Any Google account | Only if you want strangers to use **your** Client ID on your origin. Free, but they share your project’s OAuth/Drive API quotas. You lose the test-user gate. Verification may be required for broader use. |
 
-Household tip: one Client ID is enough. Add each person’s Gmail under Audience → Test users. Each signs in with their own account → data goes to **their** Drive.
+Household tip: one Client ID is enough. Add each person’s Gmail under Audience → Test users. Each signs in with their own account → data goes to **their** Drive. Each browser gets its own refresh cookie after Sign in; testers benefit from always-connected sync the same way you do.
+
+**Testing refresh tokens:** while the OAuth app stays in Testing, Google may expire refresh tokens after about **7 days**. Users then tap Sign in / Reconnect once more. Publishing the OAuth app (when you are ready) removes that Testing limit.
 
 ### Quotas (ballpark)
 
@@ -116,20 +123,22 @@ Abuse risk if you **publish**: strangers can sign in on your authorized origin a
 
 Static files. Vercel / GitHub Pages / any static host. `vercel.json` runs `npm run build` (Client ID inject) before publish. After code changes, bump `VERSION` in `sw.js` and redeploy (or hard-refresh) so PWAs pick up the new build.
 
-For the live-style default Client ID on **your** Vercel project:
+For live-style always-connected auth on **your** Vercel project:
 
 ```
 vercel env add GOOGLE_CLIENT_ID production
+vercel env add GOOGLE_CLIENT_SECRET production
+vercel env add AUTH_SECRET production
 npx vercel --prod
 ```
 
-Local serve (sign-in needs http, not `file://`):
+Local with auth API (`vercel dev`, recommended):
 
 ```
-python3 -m http.server 8080
+npx vercel dev
 ```
 
-Then add `http://localhost:8080` to the Client’s Authorized JavaScript origins, and paste the Client ID under Settings → Advanced (or run `GOOGLE_CLIENT_ID=... npm run build` once before serving).
+Use the localhost origin/redirect URI you registered (often `http://localhost:3000`). Static-only `python3 -m http.server 8080` still works for UI work, but Sign in then uses the GIS fallback (no refresh cookie) unless the BFF is running.
 
 ## Customize
 
@@ -146,11 +155,12 @@ package.json          npm run build → inject
 js/logic.js           dates, schedules, streaks, analytics
 js/store.js           browser persistence
 js/sample.js          first-run sample document (~6 months, relative to today)
-js/gdrive.js          Google Identity Services + Drive
+js/gdrive.js          Drive API + auth (BFF refresh, GIS fallback)
 js/sync.js            merge sync
 js/redact.js          screenshot cover-up editor (feedback)
 js/feedback.js        in-app Report → Discord (via /api/feedback)
 api/feedback.js       Vercel proxy to Discord webhook
+api/auth/*            OAuth start/callback/refresh/logout (refresh cookie)
 sw.js                 service worker (bump VERSION per deploy)
 manifest.webmanifest  PWA
 icons/
@@ -173,8 +183,10 @@ Local without the API: set `FEEDBACK_ENDPOINT` to a webhook URL and run `npm run
 
 - Sign-in fails on a raw file open: serve over http(s).
 - "No OAuth Client ID configured": set `GOOGLE_CLIENT_ID` on the deploy, or paste under Settings → Advanced (creating one is in this README).
-- Popup fails / origin error: current origin missing from Authorized JavaScript origins (must match exactly, e.g. `https://daycells.vercel.app`).
+- Redirect / origin error: add the exact origin under Authorized JavaScript origins and `https://your-app.vercel.app/api/auth/callback` under Authorized redirect URIs.
+- "Sign-in is not configured": set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `AUTH_SECRET` on Vercel and redeploy.
 - Access blocked: add that Gmail under Audience → Test users, or publish the OAuth app.
+- Google did not return a refresh token: Google Account → [Third-party access](https://myaccount.google.com/connections) → remove Daycells, then Sign in again (consent must include Drive).
 - **"Google Drive permission was not granted"** on Sign in: Google’s consent screen left Drive unchecked. Sign in again and allow Drive access.
 - **"Drive overwrite failed" / "insufficient authentication scopes"** on Reset all: this browser was signed in without Drive scope (granular consent). Local data is left intact. Fix:
   1. Settings → Google Drive → **Sign out**.
@@ -184,7 +196,7 @@ Local without the API: set `FEEDBACK_ENDPOINT` to a webhook URL and run `npm run
   5. Confirm sync (check a habit or open Drive → `Daycells/daycells-data.json`), then retry **Reset all**.
 - Data missing after clearing storage: reconnect Drive or import JSON.
 - Devices diverge: same Google account on both; tap the header sync control (or Reconnect on the banner if Drive sync is paused).
-- Drive sync paused after reopen (common on iPhone): checks still save locally; tap **Reconnect** on the banner or the header sync control. The banner asks at most once per day; Hide dismisses it for the day. Google may require a user tap; background reconnect is not always allowed.
+- Drive sync paused after reopen: with BFF env set, reopen should refresh quietly. If it still pauses (Testing ~7-day refresh expiry, cleared site data, or revoked access), checks still save locally; tap **Reconnect**. The banner asks at most once per day; Hide dismisses it for the day.
 - Stale UI after deploy: bump `sw.js` VERSION or hard-refresh (reopen the home-screen app if installed).
 - No Install button on Android: use Chrome/Edge over https, wait a moment on the live site, or use the browser menu → Install app.
 - iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.
