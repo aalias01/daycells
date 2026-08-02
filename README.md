@@ -31,7 +31,7 @@ Sync is offline-first: the browser is the working copy; Drive is durability. Pus
 - **Habits:** tap the check to log a day. Tap the habit row (icon or name) to edit. **Archive** in the editor (or Settings → Habits) hides the habit; restore or **delete forever** under Settings → Archived. Cards are compact check rows (no mini-grids). Use the date, arrows, or calendar for past days. Future days are blocked. The calendar shades each day by how much of that day’s scheduled habits were done (dashed = rest).
 - **Rest day** makes every habit optional that day without breaking streaks.
 - **Notes:** optional note under Habits for that day. **See all notes** lists older notes and jumps to that day.
-- **Analytics:** the right rail starts on **All** (grid icon) for a portfolio overview across habits, plus per-habit rates. Tap a habit emoji to dig into that habit (includes a streakmap you can tap to backfill days); tap the grid to return to All. Open **About these numbers** on each block for definitions.
+- **Analytics:** the right rail starts on **All** (grid icon) for a portfolio overview across habits, plus per-habit rates. Tap a habit emoji to dig into that habit; tap the grid to return to All. Open **About these numbers** on each block for definitions. Past checks are edited on Habits (date picker or year-heat jump), not in Analytics.
 - **Year heatmap:** on a phone, tap a day for details (then Open in Habits). On a laptop, click a day to open it in Habits.
 - Streaks break only on a missed scheduled day. Rest days, off days, and unfinished today carry.
 - **30-day rate:** share of scheduled days done in the last 30 days. Trends use **pp** (percentage points). At high rates, no change may read as holding strong.

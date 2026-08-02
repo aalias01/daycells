@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   /* Keep in sync with VERSION in sw.js (bump both on deploy). */
-  window.DC_VERSION = 'dc-v45';
+  window.DC_VERSION = 'dc-v46';
   const $ = sel => document.querySelector(sel);
 
   /* One-time StreakGrid → Daycells localStorage prefs. */
@@ -58,7 +58,6 @@
   let demoTourStep = 0; // 0 off; 1 Habits, 2 Settings, 3 Analytics
   let notesOpen = false;
   let signinBtnNudge = false;
-  let mapPage = 0;       // Analytics focus streakmap paging: 0 = latest 52 weeks
   let modalFocusKind = null; // last focused modal kind (avoid stealing focus on re-render)
   let analyticsMode = 'all';       // 'all' | 'focus'
   let analyticsFocusHabitId = null;
@@ -438,33 +437,6 @@
         } catch (e) {}
       }
     });
-  }
-
-  // ---------- streakmap builders ----------
-  function fullMap(h, weeks, endISO) {
-    const ink = habitInk(h);
-    const upto = endISO || Logic.todayISO();
-    let cols = Logic.streakmapWeeks(h, state.cells, state.skips, weeks, upto);
-    /* Drop leading empty weeks before the habit's first activity so short histories
-       (e.g. sample data) are not a blank left scroll of unused columns. */
-    const start = Logic.habitStartDate(h, state.cells);
-    if (start && cols.length) {
-      const firstWk = Logic.weekStartOf(start);
-      const windowEnd = cols[cols.length - 1][0].iso;
-      if (firstWk <= windowEnd) {
-        while (cols.length > 1 && cols[0][0].iso < firstWk) cols.shift();
-      }
-    }
-    const today = Logic.todayISO();
-    return '<div class="gridfull">' + cols.map(col =>
-      '<div class="col">' + col.map(c => {
-        let style = '';
-        const future = c.iso > today;
-        if (c.done) style = 'background:' + esc(ink);
-        else if (c.skip && !future) style = 'background:' + hexToRgba(ink, .36);
-        else if (!Logic.isPerWeek(h) && !Logic.isScheduled(h, c.iso) && !future) style = 'background:' + hexToRgba(ink, .36);
-        return '<span class="c' + (future ? ' future' : '') + (c.iso === today ? ' today' : '') + '" data-cell="' + c.iso + '" style="' + style + '"></span>';
-      }).join('') + '</div>').join('') + '</div>';
   }
 
   function applyTheme() {
@@ -1036,7 +1008,6 @@
     editDraft = null;
     clearPendingPicker();
     calOpen = false;
-    mapPage = 0;
     viewDate = null;
     sampleRemindOpen = false;
     sampleWarnOpen = false;
@@ -1287,29 +1258,16 @@
     );
   }
 
-  function renderAnalyticsFocusPanels(h, today, year) {
+  function renderAnalyticsFocusPanels(h, today) {
     const dow = Logic.dowShareBreakdown(h, state.cells);
     const dowMax = Math.max.apply(null, dow.concat([.01]));
     const months = Logic.monthlyCounts(h, state.cells, 6, today);
     const moMax = Math.max.apply(null, months.map(m => m.count).concat([1]));
-    const endISO = Logic.addDays(today, -364 * mapPage);
-    const startISO = Logic.addDays(Logic.weekStartOf(endISO), -7 * 51);
-    const first = Logic.habitStartDate(h, state.cells);
-    const olderExists = first && first < startISO;
-    const rangeLbl = mapPage === 0 ? 'last 52 weeks'
-      : startISO.slice(0, 10) + ' to ' + endISO.slice(0, 10);
     return '<div class="card"><h2>By weekday</h2><div class="bars">' + dow.map((n, i) =>
       '<div class="b"><b>' + Math.round(n * 100) + '%</b><i style="height:' + Math.round(n / dowMax * 100) + '%;background:' + esc(h.color) + '"></i><span>' + DOWS[i] + '</span></div>').join('') + '</div>' +
       '<div class="mini">Share of completions on each weekday (not raw counts).</div></div>' +
       '<div class="card"><h2>Last 6 months</h2><div class="bars">' + months.map(m =>
-        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>' +
-      '<div class="card" id="focus-streakmap"><h2>Streakmap · ' + rangeLbl + ' · tap a day to toggle</h2>' +
-        fullMap(h, 52, endISO) +
-        '<div class="maplegend" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
-          '<span>Full color = done · faint = rest or off day</span>' +
-          '<span><button type="button" class="pagebtn" id="mapolder"' + (olderExists ? '' : ' disabled') + '>‹ older</button>' +
-          '<button type="button" class="pagebtn" id="mapnewer"' + (mapPage > 0 ? '' : ' disabled') + '>newer ›</button></span>' +
-        '</div></div>';
+        '<div class="b"><b>' + m.count + '</b><i style="height:' + Math.round(m.count / moMax * 100) + '%;background:' + hexToRgba(h.color, .75) + '"></i><span>' + m.label + '</span></div>').join('') + '</div></div>';
   }
 
   function renderAnalyticsAllRows(habits, today) {
@@ -1375,11 +1333,9 @@
 
   function wireAnalytics(habits) {
     document.querySelectorAll('[data-analytics-mode="all"]').forEach(b => b.addEventListener('click', () => {
-      mapPage = 0;
       setAnalyticsView('all');
     }));
     document.querySelectorAll('[data-focus-habit]').forEach(b => b.addEventListener('click', () => {
-      mapPage = 0;
       setAnalyticsView('focus', b.dataset.focusHabit);
     }));
     document.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => {
@@ -1407,29 +1363,6 @@
         }
       });
     });
-    const older = $('#mapolder'), newer = $('#mapnewer');
-    if (older) older.addEventListener('click', () => { mapPage++; render(); });
-    if (newer) newer.addEventListener('click', () => { mapPage = Math.max(0, mapPage - 1); render(); });
-    const focusHabit = analyticsMode === 'focus'
-      ? habits.find(x => x.id === analyticsFocusHabitId)
-      : null;
-    if (focusHabit) {
-      document.querySelectorAll('#focus-streakmap [data-cell]').forEach(c => {
-        c.setAttribute('role', 'button');
-        c.setAttribute('tabindex', '0');
-        const toggle = () => {
-          if (c.dataset.cell > Logic.todayISO()) return;
-          gateSampleMod(() => { Store.toggleCell(c.dataset.cell, focusHabit.id); render(); });
-        };
-        c.addEventListener('click', toggle);
-        c.addEventListener('keydown', ev => {
-          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); }
-        });
-      });
-      const gf = document.querySelector('#focus-streakmap .gridfull');
-      /* Newest weeks are on the right; only auto-scroll when viewing the latest page. */
-      if (gf && mapPage === 0) gf.scrollLeft = gf.scrollWidth;
-    }
     centerYearHeatmap();
     centerYearChip(analyticsYear || Logic.dataYears(habits, state.cells).slice(-1)[0]);
     checkStreakCelebrations(habits);
@@ -1549,7 +1482,7 @@
       : renderAnalyticsAllOverview(habits, today);
 
     const body = analyticsMode === 'focus'
-      ? renderAnalyticsFocusPanels(habits.find(x => x.id === analyticsFocusHabitId), today, year)
+      ? renderAnalyticsFocusPanels(habits.find(x => x.id === analyticsFocusHabitId), today)
       : '<div class="card"><h2>Per habit · strength / 7d / 30d</h2>' + renderAnalyticsAllRows(habits, today) +
         helpDetailsHTML(
           '<p><b>Strength:</b> exponentially weighted average (Loop Habit Tracker model). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>'
@@ -1627,8 +1560,8 @@
       '<div class="card help"><h2>Analytics</h2>' +
         '<ul>' +
           '<li>The right rail starts on <b>All</b> (grid icon): portfolio overview across habits, plus per-habit rates. Open <b>About these numbers</b> on each block for definitions.</li>' +
-          '<li>Tap a habit emoji on the rail to dig into that habit alone (year heat, weekday mix, and a streakmap you can tap to backfill days). Tap the grid icon to return to All.</li>' +
-          '<li>On a phone, tap a year-heat day for a short summary and <b>Open in Habits</b>. On a laptop, click a day to jump straight there.</li>' +
+          '<li>Tap a habit emoji on the rail to dig into that habit alone (year heat, weekday mix, last 6 months). Tap the grid icon to return to All.</li>' +
+          '<li>On a phone, tap a year-heat day for a short summary and <b>Open in Habits</b>. On a laptop, click a day to jump straight there. To fix a past check, open that day on Habits.</li>' +
         '</ul>' +
         '<p class="mini"><b>30-day rate:</b> share of scheduled days done in the last 30 days. Trends use <b>pp</b> (percentage points). At high rates, no change may read as holding strong.</p>' +
         '<p class="mini"><b>Strength (0–100):</b> rolling score that weights recent days more (about a 2-week memory). A miss dents it; it never zeroes like a streak. Rest days never penalize.</p>' +
@@ -2577,7 +2510,7 @@
     if (!tab || demoTourStep) return;
     if (!allowSame && tab === activeTab) return;
     activeTab = tab;
-    editDraft = null; presetsOpen = false; clearPendingPicker(); notesOpen = false; mapPage = 0; viewDate = null; calOpen = false;
+    editDraft = null; presetsOpen = false; clearPendingPicker(); notesOpen = false; viewDate = null; calOpen = false;
     hideHeatTip();
     hideHeatDaySheet();
     render();
