@@ -4,7 +4,7 @@
  * on Vercel; scripts/inject-client-id.js writes client fields into this file at build.
  * When DISCORD_WEBHOOK_URL is set, feedbackEndpoint becomes "/api/feedback".
  * Override Client ID per browser: Settings → Advanced.
- * feedbackEndpoint set → Report UI shown; empty → hidden.
+ * feedbackEndpoint set → Feedback UI shown; empty → hidden.
  * feedbackMailto → optional mailto: fallback recipient when Discord send fails.
  */
 window.DC_CONFIG = {

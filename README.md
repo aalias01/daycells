@@ -158,7 +158,7 @@ js/sample.js          first-run sample document (~6 months, relative to today)
 js/gdrive.js          Drive API + auth (BFF refresh, GIS fallback)
 js/sync.js            merge sync
 js/redact.js          screenshot cover-up editor (feedback)
-js/feedback.js        in-app Report → Discord (via /api/feedback)
+js/feedback.js        in-app Feedback → Discord (via /api/feedback)
 api/feedback.js       Vercel proxy to Discord webhook
 api/auth/*            OAuth start/callback/refresh/logout (refresh cookie)
 sw.js                 service worker (bump VERSION per deploy)
@@ -167,15 +167,15 @@ icons/
 images/og-image.jpg  Open Graph / WhatsApp share preview (1200×630)
 ```
 
-## Feedback (tester reports)
+## Feedback
 
-When `DISCORD_WEBHOOK_URL` is set on Vercel, the live app shows a **Report** button. Testers send a short note (optional screenshot; they can cover personal details first). Reports land in your Discord channel via `/api/feedback` (webhook stays server-side).
+When `DISCORD_WEBHOOK_URL` is set on Vercel, the live app shows a **Feedback** button. Testers send a short note (optional screenshot; they can cover personal details first). Feedback lands in your Discord channel via `/api/feedback` (webhook stays server-side).
 
 1. Discord → your private server → channel → Edit channel → Integrations → Webhooks → New Webhook → Copy URL.
 2. Vercel → Project → Settings → Environment Variables:
    - `DISCORD_WEBHOOK_URL` = that URL (Production)
    - Optional: `FEEDBACK_MAILTO` = your email (mailto fallback if send fails)
-3. Redeploy. Confirm **Report** appears in the header.
+3. Redeploy. Confirm **Feedback** appears in the header.
 
 Local without the API: set `FEEDBACK_ENDPOINT` to a webhook URL and run `npm run build` (browser CORS to Discord may fail; prefer `vercel dev` with `DISCORD_WEBHOOK_URL`).
 
@@ -202,5 +202,5 @@ Local without the API: set `FEEDBACK_ENDPOINT` to a webhook URL and run `npm run
 - iPhone Install button missing: expected. In Safari use Share → Add to Home Screen. Settings → Home screen shows the same steps.
 - Want Data Access filled in: add scopes manually (Data Access section above). Sign-in will not populate that page for you.
 - Fork Sign in does nothing useful with someone else’s Client ID on your domain: create your own Web client and origins.
-- **Report** button missing: set `DISCORD_WEBHOOK_URL` on Vercel (Production) and redeploy so build injects `feedbackEndpoint: "/api/feedback"`. Forks with empty config hide Report on purpose.
+- **Feedback** button missing: set `DISCORD_WEBHOOK_URL` on Vercel (Production) and redeploy so build injects `feedbackEndpoint: "/api/feedback"`. Forks with empty config hide Feedback on purpose.
 - Feedback send fails with 503: `DISCORD_WEBHOOK_URL` missing on the Vercel function runtime (add it, redeploy).
