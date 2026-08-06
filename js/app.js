@@ -1592,7 +1592,7 @@
       (window.Feedback && Feedback.enabled()
         ? '<div class="card help"><h2>Send feedback</h2>' +
           '<p>Found a bug or something confusing? Send a short note (screenshot optional). You can cover personal details before sending.</p>' +
-          '<div class="btnrow"><button type="button" class="btn" id="help-feedback">Report a problem</button></div>' +
+          '<div class="btnrow"><button type="button" class="btn" id="help-feedback">Send feedback</button></div>' +
           '</div>'
         : '');
 
@@ -1719,8 +1719,8 @@
       '</div>' +
       (window.Feedback && Feedback.enabled()
         ? '<div class="card"><h2>Feedback</h2>' +
-          '<p class="mini" style="margin-top:0">Report a bug or something confusing. Screenshot optional; you can cover personal details before sending.</p>' +
-          '<div class="btnrow"><button type="button" class="btn" id="settings-feedback">Report a problem</button></div></div>'
+          '<p class="mini" style="margin-top:0">Share a bug, idea, or something confusing. Screenshot optional; you can cover personal details before sending.</p>' +
+          '<div class="btnrow"><button type="button" class="btn" id="settings-feedback">Send feedback</button></div></div>'
         : '') +
       '<div class="card"><h2>About</h2><div class="mini">Daycells is free and open source. Streak rules: only a missed scheduled day breaks a streak; rest days and unscheduled days carry; today stays pending until it is over. Weekly-target habits count streaks in weeks. <a href="https://github.com/aalias01/daycells" target="_blank" rel="noopener">GitHub</a></div></div>';
 
@@ -1854,7 +1854,7 @@
 
   function renderModal() {
     const root = $('#modal');
-    /* Sample warn/remind beat feedback so a stuck Report sheet cannot hide them. */
+    /* Sample warn/remind beat feedback so a stuck Feedback sheet cannot hide them. */
     if (sampleWarnOpen) { root.innerHTML = sampleWarnHTML(); wireSampleWarn(); decorateModalA11y('sampleWarn'); return; }
     if (sampleRemindOpen) { root.innerHTML = sampleRemindHTML(); wireSampleRemind(); decorateModalA11y('sampleRemind'); return; }
     if (feedbackOpen && window.Feedback) {

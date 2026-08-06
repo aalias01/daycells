@@ -252,7 +252,7 @@ header.app .sub #subline {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   flex: 0 1 auto; min-width: 0; max-width: 100%;
 }
-/* Report + email cluster packs to the right; grows left for longer emails. */
+/* Report/Feedback + email cluster packs to the right; grows left for longer emails. */
 .header-right {
   display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end;
   flex: 1 1 auto;
